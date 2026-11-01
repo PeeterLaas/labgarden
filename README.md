@@ -52,4 +52,4 @@ Serve `dist/` with any static host. The current Sites deployment remains configu
 - Replaceable local model adapters
 - Human-reviewed, traceable integration writes
 
-No open-source license has been selected yet.
+Licensed under the MIT License. See [LICENSE](LICENSE).
