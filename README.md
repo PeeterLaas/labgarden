@@ -31,6 +31,7 @@ This is a browser-only concept, not a connected laboratory system. Session state
 - `dist/app.js`: demo state and interactions
 - `.openai/hosting.json`: existing Sites deployment configuration
 - `.github/workflows/check.yml`: JavaScript syntax and local asset checks
+- `.github/workflows/pages.yml`: validate and publish `dist/` to GitHub Pages
 
 ## Validate
 
@@ -43,7 +44,9 @@ python3 scripts/check_assets.py
 
 ## Deployment
 
-Serve `dist/` with any static host. The current Sites deployment remains configured separately. This repository does not automatically publish to GitHub Pages.
+Pushes to `main` validate and publish `dist/` to GitHub Pages at https://peeterlaas.github.io/labgarden/. The deployment can also be run manually from Actions. The Sites deployment remains configured separately.
+
+If initial Pages setup is blocked by repository permissions, select **GitHub Actions** in Settings → Pages → Build and deployment, then rerun the Deploy GitHub Pages workflow.
 
 ## Roadmap
 
