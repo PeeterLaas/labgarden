@@ -1,6 +1,6 @@
-# Labgarden
+# PAIvik (Labgarden)
 
-Research, kept connected. An interactive concept for a local-first research assistant and model-tended knowledge graph.
+Research, kept connected. A local-first research workspace in University of Tartu style: capture notes, files and voice memos, connect them into a research graph, and review every suggested change. Everything runs and stays in the browser.
 
 ## Run locally
 
@@ -14,21 +14,24 @@ Open http://localhost:8000.
 
 ## What works
 
-- Explore the sample research graph using mouse or keyboard.
-- Capture notes and file metadata in the demo inbox.
-- Accept or dismiss illustrative review proposals.
-- Switch project context and explore three product directions.
-- Reset the demo to its initial state.
+- Research graph per project: click a node for details, drag (or use arrow keys) to rearrange, edit, link, unlink and delete records, and add records directly.
+- Capture text notes, files (images, audio, CSV and others, up to 50 MB each) and voice notes recorded in the browser.
+- A rule-based gardener suggests a record type and links (matching names and IDs such as `014`) and flags missing collection times and possible duplicates.
+- Review: accept, edit then accept, or dismiss each suggestion; nothing joins the graph without it. Decided changes are kept as history.
+- Previews for images, audio and CSV files; download the original file.
+- Several projects, data saved in IndexedDB across reloads, JSON export and import (including files), and reset to the sample.
+- Light and dark mode, keyboard access, and a phone layout.
 
 ## Current scope
 
-This is a browser-only concept, not a connected laboratory system. Session state is kept in memory and resets on reload. File contents are not uploaded or processed. Model inference, durable storage, eLabFTW, Workbench, and MCP adapters are proposed future integrations.
+This is a browser-only app, not a connected laboratory system. Data is stored in the browser's IndexedDB on the user's device and is never uploaded; clearing site data deletes it, so use Export to keep a copy. Suggestions come from simple rules, not an AI model. Model inference and the PAIvik notebook (eLabFTW), Carpentries Workbench and protocols.io connections are planned integrations.
 
 ## Project structure
 
-- `dist/index.html`: page and interactive workspace markup
-- `dist/style.css`: responsive presentation
-- `dist/app.js`: demo state and interactions
+- `dist/index.html`: app shell (sidebar, graph/inbox/review views, capture form, About view, dialog)
+- `dist/style.css`: UT theme (signature blue #2C5696, deep blue #1B365D, Rubik), dark mode and phone layout
+- `dist/app.js`: storage, rendering, gardener rules, review, graph interaction, export/import
+- `dist/fonts/`: Rubik webfonts (SIL Open Font License, `OFL.txt`); `dist/favicon.svg`: PAIvik mark
 - `.openai/hosting.json`: existing Sites deployment configuration
 - `.github/workflows/check.yml`: JavaScript syntax and local asset checks
 - `.github/workflows/pages.yml`: validate and publish `dist/` to GitHub Pages
@@ -50,9 +53,8 @@ If initial Pages setup is blocked by repository permissions, select **GitHub Act
 
 ## Roadmap
 
-- Durable local storage and export
-- A source-backed graph data model
-- Replaceable local model adapters
+- Replaceable local model adapters for tagging, extraction and link suggestions
+- Import from protocols.io and the PAIvik notebook
 - Human-reviewed, traceable integration writes
 
 Licensed under the MIT License. See [LICENSE](LICENSE).

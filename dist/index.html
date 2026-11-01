@@ -1,16 +1,145 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Labgarden: a concept for a local-first AI research workspace. Capture in any format. Keep your research connected."><title>Labgarden — A little order. More discovery.</title><link rel="stylesheet" href="style.css"></head>
-<body><header><a class="brand" href="#"><span class="mark">✳</span> labgarden<span class="beta">CONCEPT 01</span></a><nav><a href="#workspace">The workspace</a><a href="#ideas">Three directions</a><a href="#roots">Open by design</a></nav><a class="navcta" href="#workspace">Explore the concept <span>↗</span></a></header>
-<main><section class="hero"><div class="eyebrow"><span class="dot"></span> YOUR RESEARCH. YOUR MODELS. YOUR GROUND.</div><h1>A little order.<br>More <em>discovery.</em></h1><div class="herobottom"><p>A research assistant that turns scattered notes, images and data into a living knowledge graph.<br><strong>Small local models tend the garden. You steer the science.</strong></p><a class="primary" href="#workspace">Step into the garden <span>↓</span></a></div><div class="heroaside">CAPTURE FREELY<br>CONNECT CAREFULLY<br>KEEP GROWING</div></section>
-<section class="workspace" id="workspace"><div class="sectiontop"><div><span class="eyebrow">01 / A WORKSPACE THAT REMEMBERS</span><h2>From a loose thought<br>to a connected experiment.</h2></div><p>Try the sample workflow below.<br><span class="muted">Interactive demo · no model connected</span></p></div>
-<div class="app"><aside class="sidebar"><div class="appbrand"><span class="mark">✳</span> My garden <span class="chev">⌄</span></div><div class="local"><span class="dot"></span> Local-first by design</div><div class="sidetitle">WORKSPACE</div><button class="sideitem active" data-view="graph">◉ <span>Research graph</span><b>12</b></button><button class="sideitem" data-view="inbox">⌑ <span>Capture inbox</span><b id="inboxcount">3</b></button><button class="sideitem" data-view="review">✳ <span>Garden review</span><b id="reviewcount">3</b></button><div class="sidetitle">PROJECTS</div><button class="project selected" data-project="Water quality"><i></i> Water quality</button><button class="project" data-project="Soil microbiome"><i></i> Soil microbiome</button><div class="sidefoot"><div class="avatar">YL</div><div>Your research space<small>Illustrative sample project</small></div></div></aside>
-<div class="appbody"><div class="apptop"><div><span class="muted">Projects / </span><span id="projectname">Water quality</span></div><button id="reset" class="quiet">Reset demo ↺</button></div><div class="appheading"><div><span class="eyebrow">THE LIVING RECORD</span><h3 id="viewtitle">Everything has a place.</h3></div><span class="pill"><span class="dot"></span> Sample graph</span></div><div class="tabs"><button class="tab active" data-view="graph">Graph</button><button class="tab" data-view="inbox">Inbox</button><button class="tab" data-view="review">Review changes <span id="tabcount">3</span></button></div>
-<div id="graphview" class="view"><div class="graphwrap"><svg class="graph" viewBox="0 0 760 330" aria-label="Interactive sample research graph"><g class="edges"><path d="M365 162L165 78M365 162L145 245M365 162L555 65M365 162L590 225M365 162L380 285M555 65L590 225M145 245L380 285"/></g><text x="226" y="104" class="edgelabel">belongs to</text><text x="433" y="101" class="edgelabel">uses version</text><text x="443" y="202" class="edgelabel">produced</text><g class="node" tabindex="0" role="button" aria-label="View Water quality project" data-node="project" transform="translate(165 78)"><circle r="30" class="node-project"/><text class="symbol" y="6">◫</text><text y="49">Water quality</text><text y="66" class="nodetype">PROJECT</text></g><g class="node" tabindex="0" role="button" aria-label="View Experiment 014" data-node="experiment" transform="translate(365 162)"><circle r="42" class="node-main"/><circle r="50" class="halo"/><text class="symbol main-symbol" y="7">⚗</text><text y="67">Experiment 014</text><text y="84" class="nodetype">EXPERIMENT</text></g><g class="node" tabindex="0" role="button" aria-label="View Filtration protocol" data-node="protocol" transform="translate(555 65)"><circle r="28" class="node-protocol"/><text class="symbol" y="6">≡</text><text y="47">Filtration v2.1</text><text y="64" class="nodetype">PROTOCOL</text></g><g class="node" tabindex="0" role="button" aria-label="View Field observation" data-node="note" transform="translate(145 245)"><circle r="24" class="node-note"/><text class="symbol" y="6">♫</text><text y="43">Field observation</text><text y="60" class="nodetype">VOICE NOTE</text></g><g class="node" tabindex="0" role="button" aria-label="View Results CSV" data-node="data" transform="translate(590 225)"><circle r="30" class="node-data"/><text class="symbol" y="6">▦</text><text y="49">results_014.csv</text><text y="66" class="nodetype">DATASET</text></g><g class="node" tabindex="0" role="button" aria-label="View Sample photo" data-node="image" transform="translate(380 285)"><circle r="20" class="node-image"/><text class="symbol" y="6">▧</text><text x="78" y="3">Sample photo</text></g></svg><div class="graphlegend"><span><i class="green"></i> Research record</span><span><i class="gold"></i> Evidence</span><span>Click a node to explore ↗</span></div></div><div class="nodedetail" id="nodedetail"><span class="detailicon">⚗</span><div><strong>Experiment 014</strong><p>Connected to its project, protocol version and original evidence.</p></div><span class="detailtag">Human-reviewed</span></div></div>
-<div id="inboxview" class="view hidden"><div class="inboxintro"><h4>Capture now. Connect next.</h4><p>Add a note or a file. It stays in this browser demo; nothing is sent to a model.</p></div><div id="inboxlist"></div></div>
-<div id="reviewview" class="view hidden"><div class="inboxintro"><h4>A gardener proposes. You decide.</h4><p>Review each suggested change before it becomes part of the record.</p></div><div id="reviewlist"></div></div>
-<div class="capture"><div class="capturelabel"><span>＋ ADD TO YOUR GARDEN</span><span id="capturestatus" aria-live="polite">Text, image, audio or CSV</span></div><form id="captureform"><input id="notetext" aria-label="Research note" placeholder="What did you observe today?" maxlength="2000"><button class="send" aria-label="Add note">↑</button></form><div class="capturetools"><button id="samplevoice">♫ Try voice note</button><button id="upload">▧ Add a file</button><input type="file" id="fileinput" accept="image/*,audio/*,.csv,.txt" hidden><span>Private demo · browser memory only</span></div></div>
-</div></div><div class="workspacefoot"><span><span class="dot"></span> A concept you can explore, not a connected laboratory system.</span><span>01 — 03</span></div></section>
-<section class="gardening"><div><span class="eyebrow">QUIET INTELLIGENCE, USEFUL EVERY DAY</span><h2>Let small models<br>do the <em>gardening.</em></h2><p>The graph is the shared memory. Models are replaceable helpers. Give each a small, bounded job, and keep every proposed change traceable to its source.</p><a href="#roots" class="textlink">See what lives under the surface ↗</a></div><div class="jobs"><article><span>01</span><div><h3>Sort the incoming</h3><p>Suggest a project, extract dates and sample IDs, and flag missing fields.</p></div><b>CLASSIFY</b></article><article><span>02</span><div><h3>Make the connections</h3><p>Propose links between an observation, an experiment and the exact protocol used.</p></div><b>LINK</b></article><article><span>03</span><div><h3>Keep the record healthy</h3><p>Surface possible duplicates, broken references and conflicting metadata for review.</p></div><b>TEND</b></article><div class="rule">Sources stay intact. Uncertainty stays visible. Scientific conclusions stay yours.</div></div></section>
-<section class="ideas" id="ideas"><div class="sectiontop"><div><span class="eyebrow">02 / THREE SEEDS WORTH PLANTING</span><h2>Where should we start?</h2></div><p>One foundation. Three useful products.<br>Choose a direction to explore its first release.</p></div><div class="ideagrid"><button class="idea chosen" data-idea="0"><div class="ideatop">01 <span>RECOMMENDED FIRST</span></div><div class="ideaicon">⌁</div><h3>The notebook companion</h3><p>Talk after an experiment. Drop in a photo. Turn the mess into a reviewable notebook update.</p><span class="idealink">Bench → record <b>↗</b></span></button><button class="idea" data-idea="1"><div class="ideatop">02 <span>TEACH & REPEAT</span></div><div class="ideaicon">▤</div><h3>The protocol studio</h3><p>Keep a protocol connected to its experiments, then turn the practice into a teachable lesson.</p><span class="idealink">Practice → teaching <b>↗</b></span></button><button class="idea" data-idea="2"><div class="ideatop">03 <span>SEE THE WHOLE PICTURE</span></div><div class="ideaicon">✳</div><h3>The project garden</h3><p>A living map of questions, experiments, datasets and decisions across a research project.</p><span class="idealink">Fragments → memory <b>↗</b></span></button></div><div class="ideadetail" aria-live="polite"><div><span class="eyebrow" id="ideakicker">START SMALL, FINISH THE LOOP</span><h3 id="ideatitle">One capture. One proposed update. One review.</h3></div><div><p id="ideacopy">Start with text and CSV capture, project matching and source-backed update proposals. Add local speech and image models after the review loop works. An eLabFTW adapter would write only approved changes.</p><span class="scope" id="ideascope">FIRST RELEASE: CAPTURE → LINK → REVIEW → EXPORT</span></div></div></section>
-<section class="roots" id="roots"><div class="sectiontop"><div><span class="eyebrow">03 / STRONG ROOTS, OPEN BOUNDARIES</span><h2>Bring your own intelligence.</h2></div><p>Your laptop. Your lab server. Your choice.<br>Cloud help only when you choose it.</p></div><div class="architecture"><div class="layer"><span>01 / CAPTURE</span><h3>Voice · Pictures · Text · CSV</h3><p>Original files and notes, preserved with their source.</p></div><span class="flow">↓</span><div class="layer graphlayer"><span>02 / SHARED MEMORY</span><h3>A typed, versioned research graph</h3><p>Project → Experiment → Protocol version → Sample → Dataset → Observation</p><div class="chips"><span>Provenance</span><span>Review queue</span><span>Change history</span></div></div><span class="flow">↕</span><div class="modelrow"><div class="layer"><span>03 / LOCAL GARDENERS</span><h3>Small models, specific jobs</h3><p>Tagging, extraction, link suggestions and record checks. Route by capability, not brand.</p></div><div class="layer"><span>OPTIONAL / DEEPER HELP</span><h3>Your preferred larger model</h3><p>Explicitly selected for harder questions, with clear control over the context it receives.</p></div></div></div><div class="ecosystem"><h3>Build with the tools researchers already value.</h3><div><a href="https://doc.elabftw.net/docs/usage/api/" target="_blank" rel="noopener"><strong>eLabFTW ↗</strong><p>Proposed notebook adapter using its API. Preview and approve writes before sync.</p></a><a href="https://carpentries.org/workbench/" target="_blank" rel="noopener"><strong>Carpentries Workbench ↗</strong><p>R-based lesson publishing: a possible destination for curated training material.</p></a><div><strong>R / Shiny + MCP</strong><p>A proposed interactive analysis and tool layer, inspired by your interest in shinymcp. Adapter details to validate.</p></div></div></div><p class="architectureNote">Architecture proposal, not shipped integrations. A real local-first version needs a local runtime and model adapters; this hosted concept runs no local or cloud inference.</p></section>
-<section class="closing"><span class="eyebrow">THE PRINCIPLE</span><h2>Models will change.<br><em>Your research should endure.</em></h2><a class="primary" href="#workspace">Explore the working sketch <span>↑</span></a></section></main><footer><a class="brand" href="#"><span class="mark">✳</span> labgarden</a><span>A concept for calmer, connected research.</span><span>Built around open choices. © 2026</span></footer><script src="app.js"></script></body></html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="PAIvik: a local-first research workspace. Capture notes, files and voice memos, connect them into a research graph, and review every suggested change.">
+<meta name="color-scheme" content="light dark">
+<title>PAIvik — research, kept connected</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" aria-label="PAIvik navigation">
+    <a class="brand" href="#graph" aria-label="PAIvik home">
+      <svg class="mark" viewBox="0 0 100 100" aria-hidden="true"><rect width="100" height="100" rx="22" fill="#fff"/><g fill="none" stroke="#1B365D" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"><path d="M50 30C40 24 28 23 18 26V74C28 71 40 72 50 78C60 72 72 71 82 74V26C72 23 60 24 50 30Z"/><path d="M50 30V78"/></g><circle cx="80" cy="20" r="9" fill="#8DB4F0"/></svg>
+      <span class="wordmark">P<span>AI</span>vik</span>
+    </a>
+    <p class="tagline"><span class="dot" aria-hidden="true"></span> Local-first research workspace</p>
+
+    <nav class="nav" aria-label="Workspace">
+      <p class="navlabel">Workspace</p>
+      <a href="#graph" data-nav="graph"><span class="ico" aria-hidden="true">◉</span> Research graph <b id="count-graph">0</b></a>
+      <a href="#inbox" data-nav="inbox"><span class="ico" aria-hidden="true">⌑</span> Capture inbox <b id="count-inbox">0</b></a>
+      <a href="#review" data-nav="review"><span class="ico" aria-hidden="true">✓</span> Review changes <b id="count-review">0</b></a>
+      <a href="#about" data-nav="about"><span class="ico" aria-hidden="true">i</span> About PAIvik</a>
+    </nav>
+
+    <div class="projects">
+      <p class="navlabel">Projects <button class="link small" id="new-project" type="button">＋ New</button></p>
+      <ul id="project-list"></ul>
+    </div>
+
+    <div class="sidefoot">
+      <div class="storage" id="storage-status">Saved in this browser</div>
+      <div class="sideactions">
+        <button type="button" class="link small" id="export">Export</button>
+        <button type="button" class="link small" id="import">Import</button>
+        <button type="button" class="link small" id="reset">Reset sample</button>
+        <input type="file" id="import-file" accept="application/json,.json" hidden>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <p class="crumbs">Projects / <b id="crumb-project">—</b></p>
+      <p class="privacy">Private · nothing leaves this browser</p>
+    </header>
+
+    <section class="view" id="view-work" aria-live="polite">
+      <div class="head">
+        <div>
+          <p class="eyebrow">The living record</p>
+          <h1 id="project-title">Everything has a place.</h1>
+        </div>
+        <button type="button" class="pill" id="new-record">＋ New record</button>
+      </div>
+      <div class="tabs" role="tablist">
+        <a role="tab" href="#graph" data-tab="graph">Graph</a>
+        <a role="tab" href="#inbox" data-tab="inbox">Inbox <span class="badge" id="tab-inbox">0</span></a>
+        <a role="tab" href="#review" data-tab="review">Review changes <span class="badge" id="tab-review">0</span></a>
+      </div>
+
+      <div class="panel" id="panel-graph">
+        <div class="graphwrap">
+          <svg id="graph" viewBox="0 0 800 420" role="group" aria-label="Research graph"></svg>
+          <p class="empty" id="graph-empty" hidden>No records in this project yet. Capture something below or add a record.</p>
+        </div>
+        <div class="legend">
+          <span><i class="sw rec"></i> Research record</span>
+          <span><i class="sw evi"></i> Evidence</span>
+          <span class="hint">Click a node to explore · drag to rearrange</span>
+        </div>
+        <div class="detail" id="detail"></div>
+      </div>
+
+      <div class="panel" id="panel-inbox" hidden>
+        <ul class="cards" id="inbox-list"></ul>
+      </div>
+
+      <div class="panel" id="panel-review" hidden>
+        <p class="note">Suggestions come from simple, transparent rules in this browser (matching IDs and names). No AI model runs here. Nothing joins the record until you accept it.</p>
+        <ul class="cards" id="review-list"></ul>
+        <details class="history"><summary>Decided changes <span id="history-count">0</span></summary><ul id="history-list"></ul></details>
+      </div>
+
+      <form class="capture" id="capture" autocomplete="off">
+        <label class="caplabel" for="capture-text">＋ Add to your research</label>
+        <span class="captypes">Text, image, audio or CSV</span>
+        <textarea id="capture-text" rows="2" placeholder="What did you observe today?"></textarea>
+        <div class="capbar">
+          <button type="button" class="link" id="record-voice">♫ Record voice note</button>
+          <button type="button" class="link" id="add-file">▧ Add a file</button>
+          <input type="file" id="file-input" multiple hidden>
+          <span class="capstatus" id="capture-status" role="status"></span>
+          <button type="submit" class="send" aria-label="Add to inbox">↑</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="view about" id="view-about" hidden>
+      <p class="eyebrow">About PAIvik</p>
+      <h1>A little order. More discovery.</h1>
+      <p class="lead">PAIvik turns scattered notes, images and data into a living research graph. Helpers propose. You decide.</p>
+
+      <div class="aboutgrid">
+        <article><span>01 · Sort the incoming</span><p>Suggest a project, pick out sample and experiment IDs, and flag missing fields.</p></article>
+        <article><span>02 · Make the connections</span><p>Propose links between an observation, an experiment and the exact protocol version used.</p></article>
+        <article><span>03 · Keep the record healthy</span><p>Surface possible duplicates, broken references and conflicting metadata for review.</p></article>
+      </div>
+
+      <h2>How this version works</h2>
+      <ul class="facts">
+        <li><b>Everything stays in your browser.</b> Records, files and voice notes are stored with IndexedDB on this device. Use Export to keep a copy or move it to another browser.</li>
+        <li><b>The gardener is rule-based.</b> It matches IDs, names and file types. It runs no AI model, local or cloud.</li>
+        <li><b>Nothing changes without review.</b> Captures wait in the inbox; suggested records and links wait in Review until you accept them.</li>
+      </ul>
+
+      <h2>Where it is going</h2>
+      <div class="aboutgrid">
+        <article><span>The notebook companion</span><p>Talk after an experiment, drop in a photo, and turn it into a reviewable notebook update.</p></article>
+        <article><span>The protocol studio</span><p>Keep a protocol connected to its experiments, then turn the practice into a teachable lesson.</p></article>
+        <article><span>The project garden</span><p>A living map of questions, experiments, datasets and decisions across a project.</p></article>
+      </div>
+      <p>Planned connections, not yet part of this browser version: the PAIvik lab notebook (eLabFTW API, writes only approved changes), Carpentries Workbench lessons, protocols.io, and small local models for tagging, extraction and link suggestions.</p>
+      <p class="principle">Models will change. <em>Your research should endure.</em></p>
+    </section>
+  </main>
+</div>
+
+<dialog id="dialog">
+  <form method="dialog" id="dialog-form">
+    <h2 id="dialog-title"></h2>
+    <div id="dialog-body"></div>
+    <div class="dialogbar">
+      <button value="cancel" type="submit" class="link">Cancel</button>
+      <button value="ok" type="submit" class="btn" id="dialog-ok">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="app.js"></script>
+</body>
+</html>
