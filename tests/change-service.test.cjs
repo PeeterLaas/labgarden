@@ -101,3 +101,38 @@ test('local drafts survive restart, approval persists, and locks fail closed', a
     await assert.rejects(backend.run(file,{action:'status'}),/busy/);
   } finally {fs.rmSync(dir,{recursive:true,force:true});}
 });
+
+test('committing removes drafts it made out of date and reports them', async () => {
+  const db = backend.initial();
+  const first = await backend.execute(db, { action: 'draft_observation', project: 'p-local', text: 'First note' });
+  const second = await backend.execute(db, { action: 'draft_observation', project: 'p-local', text: 'Second note' });
+  assert.deepEqual((await backend.execute(db, { action: 'list' })).map(d => d.stale), [false, false]);
+  const done = await backend.execute(db, { action: 'commit', id: first.id, confirmation: core.confirmation(first) });
+  assert.deepEqual(done.removedOutdated.map(d => d.id), [second.id]);
+  assert.equal((await backend.execute(db, { action: 'list' })).length, 0);
+  assert.equal(db.state.nodes.length, 1);
+  await assert.rejects(backend.execute(db, { action: 'commit', id: second.id, confirmation: core.confirmation(second) }), /not found/);
+});
+
+test('drafts left behind by older versions are flagged and can be discarded', async () => {
+  const db = backend.initial();
+  const stuck = await backend.execute(db, { action: 'draft_observation', project: 'p-local', text: 'Stuck note' });
+  db.state.projects[0].name = 'Renamed outside this draft';
+  assert.equal((await backend.execute(db, { action: 'list' }))[0].stale, true);
+  await assert.rejects(backend.execute(db, { action: 'commit', id: stuck.id, confirmation: core.confirmation(stuck) }), /Workspace changed/);
+  assert.equal(db.drafts.length, 1, 'a refused commit keeps the draft');
+  assert.equal((await backend.execute(db, { action: 'discard', id: stuck.id })).discarded, stuck.id);
+  assert.equal(db.drafts.length, 0);
+  assert.equal(db.state.nodes.length, 0);
+  await assert.rejects(backend.execute(db, { action: 'discard', id: stuck.id }), /not found/);
+});
+
+test('a discard persists across restarts and leaves research records alone', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'paivik-test-')), file = path.join(dir, 'workspace.json');
+  try {
+    const p = await backend.run(file, { action: 'draft_observation', project: 'p-local', text: 'Discard me' });
+    await backend.run(file, { action: 'discard', id: p.id });
+    assert.equal((await backend.run(file, { action: 'list' })).length, 0);
+    assert.equal((await backend.run(file, { action: 'status' })).records, 0);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});

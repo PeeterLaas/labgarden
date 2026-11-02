@@ -36,7 +36,7 @@ async function main() {
     child.stdin.write(JSON.stringify({jsonrpc:'2.0',method:'notifications/initialized'})+'\n');
     const listed = await call('tools/list');
     const names = listed.result.tools.map(t => t.name);
-    assert.equal(names.length,6); assert.ok(!names.some(n => /commit|approve/.test(n)));
+    assert.equal(names.length,6); assert.ok(!names.some(n => /commit|approve|discard/.test(n)));
     const draft = await call('tools/call', {name:'draft_observation',arguments:{project_id:'p-local',text:'Synthetic MCP wire observation'}});
     assert.ok(!draft.error && !draft.result.isError, JSON.stringify(draft));
     const status = await call('tools/call', {name:'workspace_status',arguments:{}});

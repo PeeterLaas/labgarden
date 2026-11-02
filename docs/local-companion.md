@@ -58,6 +58,8 @@ Available tools:
 
 Example: ask the model to call `workspace_status`, then draft an observation in project `p-local`. No research record is added. In the local Shiny console, refresh, select the proposal and load its exact preview. Type `CONFIRM` and commit. A stale proposal must be redrafted; the model cannot bypass that requirement.
 
+Committing changes the workspace, so it also removes any other pending proposals prepared against the old version and lists them in its result; draft them again if they are still wanted. Older proposals that can no longer commit appear as `[out of date]`. To drop a proposal yourself, select it and choose **Discard selected proposal**. Discarding is available only in the Shiny console, never as a model tool, and does not change research records.
+
 Drafts and approved records survive restarts. The initial local adapter uses a lock file and atomic replacement of a JSON workspace. A concurrent request fails closed rather than overwriting another process. After a crash, inspect the workspace and the PID in its `.lock` file before manually removing a genuinely stale lock. Back up the workspace regularly. Database-scale concurrency and power-loss durability are outside this adapter's guarantee.
 
 ## Move text workspaces between browser and companion

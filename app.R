@@ -10,6 +10,7 @@ ui <- shiny::fluidPage(
   shiny::verbatimTextOutput("change_preview"),
   shiny::textInput("confirmation", "Type CONFIRM for the displayed revision", value = ""),
   shiny::actionButton("commit", "Confirm and commit displayed changes"),
+  shiny::actionButton("discard", "Discard selected proposal"),
   shiny::verbatimTextOutput("result"),
   shiny::hr(), shiny::h3("Bring in a text-only browser workspace"),
   shiny::fileInput("browser_export", "PAIvik JSON export (text-only)", accept = ".json"),
@@ -21,7 +22,7 @@ server <- function(input, output, session) {
   result <- shiny::reactiveVal("No changes committed.")
   refresh <- function() {
     proposals <- paivik_request("list")
-    choices <- stats::setNames(vapply(proposals, function(p) p$id, ""), vapply(proposals, function(p) paste(p$reason, p$id), ""))
+    choices <- stats::setNames(vapply(proposals, function(p) p$id, ""), vapply(proposals, function(p) paste0(if (isTRUE(p$stale)) "[out of date] " else "", p$reason, " ", p$id), ""))
     shiny::updateSelectInput(session, "proposal_id", choices = choices)
   }
   safely <- function(f) tryCatch(f(), error = function(e) { result(conditionMessage(e)); NULL })
@@ -45,6 +46,16 @@ server <- function(input, output, session) {
         actor = Sys.getenv("PAIVIK_OWNER", unset = "local-user"), method = "typed")
       committed <- paivik_request("commit", id = p$id, confirmation = approval)
       result(paivik_json(committed)); displayed(NULL)
+      shiny::updateTextInput(session, "confirmation", value = "")
+      refresh()
+    })
+  })
+  shiny::observeEvent(input$discard, {
+    safely(function() {
+      shiny::req(nzchar(input$proposal_id))
+      discarded <- paivik_request("discard", id = input$proposal_id)
+      result(paste("Discarded, research records unchanged:", discarded$reason, discarded$discarded))
+      displayed(NULL)
       shiny::updateTextInput(session, "confirmation", value = "")
       refresh()
     })

@@ -91,6 +91,7 @@
           const disk = existing.result ? changes.canonical(changes.snapshot(existing.result)) : null;
           if (disk !== this.lastSaved) {
             failure = new Error('Workspace changed in another tab. Export your current work, then reload before committing.');
+            failure.staleTab = true;
             tx.abort(); return;
           }
           const files = tx.objectStore('files');
@@ -217,12 +218,17 @@
   const save = () => {
     clearTimeout(saveTimer);
     saveTimer = setTimeout(async () => {
-      try { await persist(structuredClone(state)); } catch { setStorage(false); }
+      try { await persist(structuredClone(state)); setStorage(true); }
+      catch (error) {
+        setStorage(false, error.staleTab);
+        if (error.staleTab) toast(STALE_TAB);
+      }
     }, 150);
   };
-  const setStorage = (ok) => {
+  const STALE_TAB = 'Not saved: this workspace changed in another tab. Copy any unsaved text, then reload.';
+  const setStorage = (ok, staleTab = false) => {
     const el = $('#storage-status');
-    el.textContent = ok ? 'Saved in this browser' : 'Not saved: browser storage is unavailable. Use Export.';
+    el.textContent = ok ? 'Saved in this browser' : staleTab ? STALE_TAB : 'Not saved: browser storage is unavailable. Use Export.';
     el.classList.toggle('warn', !ok);
   };
   const cur = () => state.projects.find((p) => p.id === state.current) || state.projects[0];
@@ -293,8 +299,11 @@
       if (fileActions.clear || fileActions.remove?.length) { urls.forEach(u => URL.revokeObjectURL(u)); urls.clear(); }
       render(); toast('Approved changes committed and saved');
       return true;
-    } catch (error) { state = original; toast(error.message); return false; }
-    finally { reviewing = false; }
+    } catch (error) {
+      state = original; toast(error.message);
+      if (error.staleTab) setStorage(false, true);
+      return false;
+    } finally { reviewing = false; }
   }
 
   // ---------- Routing ----------
