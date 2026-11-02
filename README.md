@@ -1,6 +1,6 @@
 # PAIvik (Labgarden)
 
-Research, kept connected. A local-first research workspace in University of Tartu style: capture notes, files and voice memos, connect them into a research graph, and review every suggested change. Everything runs and stays in the browser.
+Research, kept connected. A local-first research workspace in University of Tartu style: capture notes, files and voice memos, connect them into a research graph, and review every suggested change. The browser app runs and stores its data on your device; an optional local R companion uses a separate on-disk workspace.
 
 ## Run locally
 
@@ -25,7 +25,7 @@ Open http://localhost:8000.
 
 ## Current scope
 
-This is a browser-only app, not a connected laboratory system. Data is stored in the browser's IndexedDB on the user's device and is never uploaded; clearing site data deletes it, so use Export to keep a copy. Suggestions come from simple rules, not an AI model. Model inference and the PAIvik notebook (eLabFTW), Carpentries Workbench and protocols.io connections are planned integrations.
+The browser app is not a connected laboratory system. Its data is stored in IndexedDB on the user's device and is never uploaded; clearing site data deletes it, so use Export to keep a copy. Suggestions come from simple rules, not an AI model. Model inference and the PAIvik notebook (eLabFTW), Carpentries Workbench and protocols.io connections are planned integrations.
 
 An optional **local R/Shiny + shinymcp companion** is now included. It shares the exact JavaScript validation/approval core, exposes search and draft tools, and provides a separate human approval console. It uses its own local text workspace, not automatic browser synchronization. See [local companion setup](docs/local-companion.md).
 
@@ -39,7 +39,7 @@ An optional **local R/Shiny + shinymcp companion** is now included. It shares th
 - `R/`, `app.R`, `mcp.R`: R adapter, Shiny approval console and draft-only MCP tools
 - `dist/fonts/`: Rubik webfonts (SIL Open Font License, `OFL.txt`); `dist/favicon.svg`: PAIvik mark
 - `.openai/hosting.json`: existing Sites deployment configuration
-- `.github/workflows/check.yml`: JavaScript syntax and local asset checks
+- `.github/workflows/check.yml`: JavaScript syntax, local assets, core approval tests and R/MCP integration tests
 - `.github/workflows/pages.yml`: validate and publish `dist/` to GitHub Pages
 
 ## Validate

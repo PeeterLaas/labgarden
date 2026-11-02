@@ -47,9 +47,12 @@ async function main() {
     assert.ok(forbidden.error || forbidden.result?.isError);
     console.log('MCP stdio passed: handshake, six bounded tools, draft persistence, no model commit tool.');
   } finally {
-    child.stdin.end();
-    child.kill();
-    await once(child,'close');
+    const close = once(child, 'close');
+    if (child.exitCode === null && child.signalCode === null) {
+      child.stdin.end();
+      child.kill();
+      await close;
+    }
     fs.rmSync(dir,{recursive:true,force:true});
   }
 }

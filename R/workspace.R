@@ -12,8 +12,14 @@ paivik_request <- function(action, ...) {
   Sys.setenv(PAIVIK_WORKSPACE = workspace)
   on.exit(if (is.na(old)) Sys.unsetenv("PAIVIK_WORKSPACE") else Sys.setenv(PAIVIK_WORKSPACE = old), add = TRUE)
   output <- suppressWarnings(system2(node, shQuote(script), input = input, stdout = TRUE, stderr = FALSE))
-  response <- jsonlite::fromJSON(paste(output, collapse = "\n"), simplifyVector = FALSE)
+  status <- attr(output, "status")
+  if (!length(output) || !nzchar(paste(output, collapse = ""))) {
+    stop(sprintf("Workspace service returned no response (exit status %s). Check the Node executable and service path.", if (is.null(status)) 0L else status), call. = FALSE)
+  }
+  response <- tryCatch(jsonlite::fromJSON(paste(output, collapse = "\n"), simplifyVector = FALSE),
+    error = function(e) stop("Workspace service returned an invalid response. Check the local Node service.", call. = FALSE))
   if (!isTRUE(response$ok)) stop(response$error, call. = FALSE)
+  if (!is.null(status) && status != 0L) stop(sprintf("Workspace service failed (exit status %s)", status), call. = FALSE)
   response$result
 }
 

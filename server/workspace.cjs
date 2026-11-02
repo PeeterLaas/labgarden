@@ -90,7 +90,10 @@ async function run(file, request, owner) {
       } finally { if (fs.existsSync(tmp)) fs.unlinkSync(tmp); }
     }
     return result;
-  } finally { fs.closeSync(fd); fs.unlinkSync(lock); }
+  } finally {
+    try { fs.closeSync(fd); } catch { /* Preserve the operation result during cleanup. */ }
+    try { fs.unlinkSync(lock); } catch { /* Subsequent requests still fail closed on a stale lock. */ }
+  }
 }
 if (require.main === module) {
   let input = '';
