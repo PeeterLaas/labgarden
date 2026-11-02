@@ -16,7 +16,7 @@ node --check dist/app.js                        # syntax check (the only JS "lin
 python3 scripts/check_assets.py                 # verify every local <script src>/<link href> in index.html exists
 ```
 
-There are no tests. CI (`.github/workflows/check.yml`) runs the two checks on every push and PR.
+The approval service and optional local R/MCP companion have tests. Run `node --test tests/*.test.cjs`, plus `Rscript tests/integration.R` and `node tests/mcp-stdio.cjs` when the R dependencies are installed. CI runs the checks and tests on pushes and PRs. See `docs/local-companion.md`. The static browser app still has no build step or external runtime dependencies.
 
 ## Deployment
 
@@ -37,5 +37,9 @@ Readable, framework-free files in `dist/`:
   - All user text goes through `esc()` before entering `innerHTML`. Clicks are handled by one delegated listener keyed on `data-*` attributes.
   - Export is JSON (`app: 'paivik'`, state, files as data URLs); import validates that shape before replacing everything.
 - `style.css`: design tokens on `:root`, redefined under `prefers-color-scheme: dark`; phone layout below 860px.
+
+Research mutations must use `stageChange()` and `dist/change-service.js`; do not add direct graph writes in event handlers. Capture intake, draft checkbox choices and graph layout are separate. The core binds approval to a proposal ID, revision, SHA-256 digest and expected workspace snapshot, then appends an audit event. Browser persistence writes state and file changes in one IndexedDB transaction and rejects stale writes from another tab.
+
+The optional local companion uses the same core through `server/workspace.cjs`. Its R tools expose read/draft operations only; do not expose approval or commit as model tools. `app.R` is a single-owner localhost approval console. The local file store is an initial adapter, not multi-user authentication or automatic browser sync. Keep `.r-library`, `.deps` and `local-data` ignored and out of commits.
 
 After any change, run both checks and try the flows in a browser (capture → review → accept, reload persists, export/import).
