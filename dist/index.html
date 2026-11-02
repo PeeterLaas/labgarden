@@ -88,7 +88,7 @@
       <form class="capture" id="capture" autocomplete="off">
         <label class="caplabel" for="capture-text">＋ Add to your research</label>
         <span class="captypes">Text, image, audio or CSV</span>
-        <textarea id="capture-text" rows="2" placeholder="What did you observe today?"></textarea>
+        <textarea id="capture-text" rows="2" maxlength="20000" placeholder="What did you observe today?"></textarea>
         <div class="capbar">
           <button type="button" class="link" id="record-voice">♫ Record voice note</button>
           <button type="button" class="link" id="add-file">▧ Add a file</button>
@@ -134,12 +134,13 @@
     <h2 id="dialog-title"></h2>
     <div id="dialog-body"></div>
     <div class="dialogbar">
-      <button value="cancel" type="submit" class="link">Cancel</button>
+      <button value="cancel" type="submit" class="link" formnovalidate>Cancel</button>
       <button value="ok" type="submit" class="btn" id="dialog-ok">Save</button>
     </div>
   </form>
 </dialog>
 
+<script src="change-service.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

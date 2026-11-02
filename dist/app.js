@@ -9,6 +9,7 @@
   const when = (iso) => new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   const size = (b) => (b > 1e6 ? `${(b / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1e3))} kB`);
   const W = 800, H = 420;
+  const changes = window.PaivikChanges;
 
   // ---------- Record types and icons ----------
   const TYPES = {
@@ -41,6 +42,7 @@
   // ---------- Storage: IndexedDB, with an in-memory fallback ----------
   const store = {
     db: null,
+    lastSaved: null,
     memFiles: new Map(),
     async open() {
       try {
@@ -67,6 +69,28 @@
     async getFile(id) { return this.db ? this.run('files', 'readonly', (s) => s.get(id)) : this.memFiles.get(id); },
     async delFile(id) { this.db ? await this.run('files', 'readwrite', (s) => s.delete(id)) : this.memFiles.delete(id); },
     async clearFiles() { this.db ? await this.run('files', 'readwrite', (s) => s.clear()) : this.memFiles.clear(); },
+    async persist(next, { clear = false, put = [], remove = [] } = {}) {
+      if (!this.db) throw new Error('Browser storage is unavailable. No research change was committed.');
+      await new Promise((resolve, reject) => {
+        const tx = this.db.transaction(['kv', 'files'], 'readwrite');
+        let failure;
+        const existing = tx.objectStore('kv').get('state');
+        existing.onsuccess = () => {
+          const disk = existing.result ? changes.canonical(changes.snapshot(existing.result)) : null;
+          if (disk !== this.lastSaved) {
+            failure = new Error('Workspace changed in another tab. Export your current work, then reload before committing.');
+            tx.abort(); return;
+          }
+          const files = tx.objectStore('files');
+          if (clear) files.clear();
+          remove.forEach(id => files.delete(id));
+          put.forEach(([id, blob]) => files.put(blob, id));
+          tx.objectStore('kv').put(next, 'state');
+        };
+        tx.oncomplete = () => { this.lastSaved = changes.canonical(changes.snapshot(next)); resolve(); };
+        tx.onerror = tx.onabort = () => reject(failure || tx.error || new Error('Storage transaction aborted'));
+      });
+    },
   };
 
   // ---------- Sample data ----------
@@ -140,7 +164,7 @@
     }
     const proj = nodes.find((n) => n.type === 'project');
     if (proj) links.push({ to: proj.id, label: 'belongs to', why: 'captured in this project', checked: !links.some((l) => l.checked) });
-    const title = cap.title || (cap.text.split(/\s+/).slice(0, 7).join(' ') + (cap.text.split(/\s+/).length > 7 ? '…' : ''));
+    const title = (cap.title || (cap.text.split(/\s+/).slice(0, 7).join(' ') + (cap.text.split(/\s+/).length > 7 ? '…' : ''))).slice(0, 120);
     const out = [{
       id: uid('r'), project: cap.project, capture: cap.id, kind: 'add', status: 'pending', created: now(),
       node: { type, title, text: cap.text || '', fileId: cap.fileId || null, mime: cap.mime || '' },
@@ -169,11 +193,18 @@
   // ---------- App state ----------
   let state;
   let saveTimer;
+  let persistence = Promise.resolve();
+  let reviewing = false;
   const urls = new Map();
+  function persist(next, files) {
+    const task = persistence.then(() => store.persist(next, files));
+    persistence = task.catch(() => {});
+    return task;
+  }
   const save = () => {
     clearTimeout(saveTimer);
     saveTimer = setTimeout(async () => {
-      try { await store.set('state', state); } catch { setStorage(false); }
+      try { await persist(structuredClone(state)); } catch { setStorage(false); }
     }, 150);
   };
   const setStorage = (ok) => {
@@ -213,6 +244,42 @@
     .map(([k, v]) => `<option value="${k}"${k === sel ? ' selected' : ''}>${v.label}</option>`).join('');
   const nodeOptions = (exclude) => nodesHere().filter((n) => n.id !== exclude)
     .map((n) => `<option value="${n.id}">${esc(n.title)} · ${TYPES[n.type].label}</option>`).join('');
+
+  // All scientific mutations share this preview/confirmation/commit boundary.
+  // Capture intake and layout moves are saved independently, without changing the research graph.
+  async function stageChange(reason, mutate, fileActions = {}) {
+    if (reviewing) { toast('Finish the current review first'); return false; }
+    reviewing = true;
+    const original = state;
+    let desired;
+    try {
+      desired = structuredClone(state);
+      state = desired;
+      try { mutate(); } finally { state = original; }
+      const proposal = await changes.prepare(state, desired, { reason });
+      const summary = proposal.operations.map(op => `<li><strong>${esc(op.collection)}: ${esc(op.id)}</strong>` +
+        `<div>Before</div><pre>${esc(JSON.stringify(op.before, null, 2))}</pre>` +
+        `<div>After</div><pre>${esc(JSON.stringify(op.after, null, 2))}</pre></li>`).join('');
+      const approval = await ask({ title: 'Confirm research changes', ok: 'Confirm and commit', body:
+        `<p>${esc(reason)}</p><p>Review the exact additions, edits and removals below. Cancel leaves research records unchanged.</p>` +
+        `<details open><summary>${proposal.operations.length} changes · revision ${proposal.revision}</summary><ol class="change-preview">${summary}</ol></details>` +
+        '<label>Type CONFIRM to approve this preview<input name="confirmation" required pattern="CONFIRM" autocomplete="off"></label>' });
+      if (!approval || approval.get('confirmation') !== 'CONFIRM') return false;
+      const next = await changes.commit(state, proposal, changes.confirmation(proposal, 'local-user', 'typed'));
+      next.current = desired.current; next.selected = desired.selected;
+      // Preserve the placement chosen for new nodes; coordinates are not research content.
+      next.nodes.forEach(n => { if (!state.nodes.some(old => old.id === n.id)) {
+        const planned = desired.nodes.find(d => d.id === n.id); n.x = planned.x; n.y = planned.y;
+      } });
+      clearTimeout(saveTimer);
+      await persist(next, fileActions);
+      state = next;
+      if (fileActions.clear || fileActions.remove?.length) { urls.forEach(u => URL.revokeObjectURL(u)); urls.clear(); }
+      render(); toast('Approved changes committed and saved');
+      return true;
+    } catch (error) { state = original; toast(error.message); return false; }
+    finally { reviewing = false; }
+  }
 
   // ---------- Routing ----------
   const VIEWS = ['graph', 'inbox', 'review', 'about'];
@@ -360,9 +427,9 @@
           <button type="button" class="link" data-edit-accept="${r.id}">Edit, then accept</button>
           <button type="button" class="link" data-dismiss="${r.id}">Dismiss</button></div></li>`;
     }).join('') : '<li class="blank">Nothing to review. New captures will bring suggestions here.</li>';
-    const done = state.proposals.filter((r) => r.project === state.current && r.status !== 'pending').slice().reverse();
+    const done = (state.audit || []).slice().reverse();
     $('#history-count').textContent = done.length;
-    $('#history-list').innerHTML = done.map((r) => `<li>${{ accepted: 'Accepted', dismissed: 'Dismissed', resolved: 'Resolved' }[r.status]}: ${esc(r.kind === 'flag' ? r.title : `add “${r.node.title}”`)} · ${when(r.decided || r.created)}</li>`).join('');
+    $('#history-list').innerHTML = done.map(event => `<li>${esc(event.reason)} · ${esc(event.actor)} · ${esc(event.method)} · ${when(event.at)}<details><summary>Approved changes</summary><pre>${esc(JSON.stringify(event.operations, null, 2))}</pre></details></li>`).join('');
   }
 
   // ---------- Graph mutations ----------
@@ -391,7 +458,7 @@
     return n;
   }
   function fileInUse(fileId, exceptNode) {
-    return state.nodes.some((n) => n.fileId === fileId && n.id !== exceptNode) || state.inbox.some((c) => c.fileId === fileId && c.status === 'pending');
+    return state.nodes.some((n) => n.fileId === fileId && n.id !== exceptNode) || state.inbox.some((c) => c.fileId === fileId);
   }
 
   function accept(r, override) {
@@ -400,7 +467,6 @@
     r.status = 'accepted'; r.decided = now(); r.result = n.id;
     const cap = state.inbox.find((c) => c.id === r.capture);
     if (cap) { cap.status = 'filed'; cap.node = n.id; }
-    toast(`Added “${n.title}” to the graph`);
   }
 
   // ---------- Events ----------
@@ -415,9 +481,7 @@
       if (d.unlink) {
         ev.stopPropagation();
         const e = state.edges.find((x) => x.id === d.unlink);
-        if (e && await ask({ title: 'Remove this link?', body: `<p>${esc(node(e.from).title)} — ${esc(e.label)} — ${esc(node(e.to).title)}</p>`, ok: 'Remove', danger: true })) {
-          state.edges = state.edges.filter((x) => x !== e); save(); render();
-        }
+        if (e) await stageChange('Remove relationship', () => { state.edges = state.edges.filter(x => x.id !== e.id); });
         return;
       }
       if (d.goto) { state.selected = d.goto; save(); if (view() !== 'graph') location.hash = 'graph'; else render(); return; }
@@ -425,17 +489,21 @@
       if (d.accept || d.editAccept) return reviewAccept(d.accept || d.editAccept, !!d.editAccept);
       if (d.dismiss || d.resolve) {
         const r = state.proposals.find((x) => x.id === (d.dismiss || d.resolve));
-        r.status = d.resolve ? 'resolved' : 'dismissed'; r.decided = now();
-        if (r.kind === 'add') { const c = state.inbox.find((x) => x.id === r.capture); if (c) c.status = 'dismissed'; }
-        save(); render(); return;
+        await stageChange(d.resolve ? 'Resolve review flag' : 'Dismiss suggestion', () => {
+          const target = state.proposals.find(x => x.id === r.id);
+          target.status = d.resolve ? 'resolved' : 'dismissed'; target.decided = now();
+          if (target.kind === 'add') { const c = state.inbox.find(x => x.id === target.capture); if (c) c.status = 'dismissed'; }
+        });
+        return;
       }
       if (d.delcap) {
         const c = state.inbox.find((x) => x.id === d.delcap);
-        if (!(await ask({ title: 'Delete this capture?', body: `<p>“${esc(c.title || c.text.slice(0, 60))}” and its open suggestions will be removed. Records already in the graph stay.</p>`, ok: 'Delete', danger: true }))) return;
-        state.inbox = state.inbox.filter((x) => x !== c);
-        state.proposals = state.proposals.filter((r) => !(r.capture === c.id && r.status === 'pending'));
-        if (c.fileId && !fileInUse(c.fileId)) await store.delFile(c.fileId);
-        save(); render(); return;
+        const remove = c.fileId && !state.nodes.some(n => n.fileId === c.fileId) && !state.inbox.some(x => x.id !== c.id && x.fileId === c.fileId) ? [c.fileId] : [];
+        await stageChange('Delete capture and its suggestions (existing graph records stay)', () => {
+          state.inbox = state.inbox.filter(x => x.id !== c.id);
+          state.proposals = state.proposals.filter(r => r.capture !== c.id);
+        }, { remove });
+        return;
       }
     });
 
@@ -486,6 +554,7 @@
     // Capture: text, files, voice
     $('#capture').addEventListener('submit', (e) => {
       e.preventDefault();
+      if (reviewing) { toast('Finish the current review first'); return; }
       const text = $('#capture-text').value.trim();
       if (!text) { $('#capture-text').focus(); return; }
       const { props } = addCapture(state, { kind: 'text', text });
@@ -498,6 +567,7 @@
     $('#add-file').addEventListener('click', () => $('#file-input').click());
     $('#file-input').addEventListener('change', async (e) => {
       const files = [...e.target.files]; e.target.value = '';
+      if (reviewing) { toast('Finish the current review first'); return; }
       let props = [];
       for (const f of files) {
         if (f.size > 50e6) { toast(`${f.name} is larger than 50 MB and was skipped`); continue; }
@@ -511,6 +581,7 @@
     const voiceBtn = $('#record-voice');
     if (!navigator.mediaDevices || !window.MediaRecorder) voiceBtn.hidden = true;
     voiceBtn.addEventListener('click', async () => {
+      if (reviewing) { toast('Finish the current review first'); return; }
       if (rec) { rec.stop(); return; }
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -539,19 +610,22 @@
     $('#new-project').addEventListener('click', async () => {
       const f = await ask({ title: 'New project', body: '<label>Project name<input name="name" required maxlength="60"></label><label>Short description<input name="text" maxlength="200"></label>', ok: 'Create' });
       if (!f || !f.get('name').trim()) return;
-      const p = { id: uid('p'), name: f.get('name').trim() };
-      state.projects.push(p); state.current = p.id;
-      const n = addNode({ type: 'project', title: p.name, text: f.get('text').trim() });
-      n.x = W / 2; n.y = H / 2;
-      save(); location.hash = 'graph'; render();
+      await stageChange('Create project', () => {
+        const p = { id: uid('p'), name: f.get('name').trim() };
+        state.projects.push(p); state.current = p.id;
+        const n = addNode({ type: 'project', title: p.name, text: f.get('text').trim() });
+        n.x = W / 2; n.y = H / 2;
+      });
+      location.hash = 'graph'; render();
     });
     $('#export').addEventListener('click', exportData);
     $('#import').addEventListener('click', () => $('#import-file').click());
     $('#import-file').addEventListener('change', importData);
     $('#reset').addEventListener('click', async () => {
-      if (!(await ask({ title: 'Reset to the sample?', body: '<p>All projects, records, captures and files in this browser will be replaced by the sample. Export first if you want to keep them.</p>', ok: 'Reset', danger: true }))) return;
-      await store.clearFiles(); urls.forEach((u) => URL.revokeObjectURL(u)); urls.clear();
-      state = sample(); save(); location.hash = 'graph'; render(); toast('Sample restored');
+      await stageChange('Replace workspace with sample data and remove stored files. Export first to retain a copy.', () => {
+        Object.assign(state, sample());
+      }, { clear: true });
+      location.hash = 'graph'; render();
     });
   }
 
@@ -569,30 +643,40 @@
         ${n.type === 'project' ? '' : `<label>Type<select name="type">${typeOptions(n.type)}</select></label>`}
         <label>Description<textarea name="text" rows="3" maxlength="2000">${esc(n.text)}</textarea></label>` });
       if (!f) return;
-      n.title = f.get('title').trim() || n.title; n.text = f.get('text').trim();
-      if (f.get('type')) n.type = f.get('type');
-      if (n.type === 'project') { const p = state.projects.find((x) => x.id === n.project); if (p) p.name = n.title; }
+      await stageChange('Edit research record', () => {
+        const target = node(n.id);
+        target.title = f.get('title').trim() || target.title; target.text = f.get('text').trim();
+        if (f.get('type')) target.type = f.get('type');
+        if (target.type === 'project') { const p = state.projects.find(x => x.id === target.project); if (p) p.name = target.title; }
+      });
     }
     if (act === 'link') {
       const opts = nodeOptions(n.id);
       if (!opts) { toast('Add another record first'); return; }
       const f = await ask({ title: `Link “${n.title}” to…`, body: `<label>Record<select name="to">${opts}</select></label><label>Relationship<input name="label" required maxlength="40" value="related to"></label>`, ok: 'Link' });
       if (!f) return;
-      state.edges.push({ id: uid('e'), from: n.id, to: f.get('to'), label: f.get('label').trim() || 'related to' });
+      await stageChange('Add relationship', () => {
+        state.edges.push({ id: uid('e'), from: n.id, to: f.get('to'), label: f.get('label').trim() || 'related to' });
+      });
     }
     if (act === 'delete') {
-      if (!(await ask({ title: `Delete “${n.title}”?`, body: '<p>The record and its links are removed from the graph. This can’t be undone (unless you exported a copy).</p>', ok: 'Delete', danger: true }))) return;
-      state.nodes = state.nodes.filter((x) => x !== n);
-      state.edges = state.edges.filter((e) => e.from !== n.id && e.to !== n.id);
-      if (n.fileId && !fileInUse(n.fileId)) { await store.delFile(n.fileId); urls.delete(n.fileId); }
-      state.selected = null;
+      const remove = n.fileId && !fileInUse(n.fileId, n.id) ? [n.fileId] : [];
+      await stageChange('Delete record and its relationships', () => {
+        state.nodes = state.nodes.filter(x => x.id !== n.id);
+        state.edges = state.edges.filter(e => e.from !== n.id && e.to !== n.id);
+        state.selected = null;
+      }, { remove });
     }
-    save(); render();
+    render();
   }
 
   async function reviewAccept(id, edit) {
     const r = state.proposals.find((x) => x.id === id);
-    if (!edit) { accept(r); save(); render(); return; }
+    if (!r || r.status !== 'pending') return;
+    if (!edit) {
+      await stageChange('Accept suggested record and selected relationships', () => accept(state.proposals.find(x => x.id === id)));
+      return;
+    }
     const live = r.links.map((l, i) => ({ l, i })).filter(({ l }) => node(l.to));
     const f = await ask({ title: 'Edit, then accept', ok: 'Accept', body: `
       <label>Title<input name="title" required maxlength="120" value="${esc(r.node.title)}"></label>
@@ -600,8 +684,10 @@
       <label>Description<textarea name="text" rows="3" maxlength="2000">${esc(r.node.text)}</textarea></label>
       ${live.map(({ l, i }) => `<label style="flex-direction:row;gap:8px"><input type="checkbox" name="link" value="${i}"${l.checked ? ' checked' : ''}> ${esc(l.label)} ${esc(node(l.to).title)}</label>`).join('')}` });
     if (!f) return;
-    accept(r, { node: { title: f.get('title').trim() || r.node.title, type: f.get('type'), text: f.get('text').trim() }, links: f.getAll('link').map(Number) });
-    save(); render();
+    await stageChange('Accept corrected suggestion', () => accept(state.proposals.find(x => x.id === id), {
+      node: { title: f.get('title').trim() || r.node.title, type: f.get('type'), text: f.get('text').trim() },
+      links: f.getAll('link').map(Number),
+    }));
   }
 
   async function newRecord() {
@@ -614,8 +700,10 @@
       <label>Relationship<input name="label" maxlength="40" value="related to"></label>` : ''}` });
     if (!f || !f.get('title').trim()) return;
     const to = f.get('to');
-    addNode({ type: f.get('type'), title: f.get('title').trim(), text: f.get('text').trim() }, to ? [{ to, label: f.get('label').trim() || 'related to' }] : []);
-    save(); location.hash = 'graph'; render();
+    await stageChange('Add research record', () => {
+      addNode({ type: f.get('type'), title: f.get('title').trim(), text: f.get('text').trim() }, to ? [{ to, label: f.get('label').trim() || 'related to' }] : []);
+    });
+    location.hash = 'graph'; render();
   }
 
   // ---------- Export / import ----------
@@ -641,13 +729,25 @@
     try { data = JSON.parse(await file.text()); } catch { toast('That file is not valid JSON'); return; }
     const s = data && data.state;
     if (data.app !== 'paivik' || !s || !Array.isArray(s.nodes) || !Array.isArray(s.projects) || !s.projects.length) { toast('Not a PAIvik export'); return; }
-    if (!(await ask({ title: 'Import this export?', body: `<p>${s.projects.length} projects and ${s.nodes.length} records from ${esc(data.exported ? when(data.exported) : 'an export')}. Everything currently in this browser will be replaced.</p>`, ok: 'Import', danger: true }))) return;
-    await store.clearFiles(); urls.clear();
-    for (const [id, dataUrl] of Object.entries(data.files || {})) {
-      try { await store.putFile(id, await (await fetch(dataUrl)).blob()); } catch { /* skip unreadable file */ }
-    }
-    state = { edges: [], inbox: [], proposals: [], ...s };
-    save(); location.hash = 'graph'; render(); toast('Import complete');
+    try {
+      const imported = { edges: [], inbox: [], proposals: [], ...s };
+      changes.validate(imported);
+      const put = [];
+      for (const [id, dataUrl] of Object.entries(data.files || {})) {
+        if (!/^[A-Za-z0-9_-]+$/.test(id) || typeof dataUrl !== 'string' || !/^data:[\w.+/-]*;base64,[A-Za-z0-9+/=\r\n]*$/.test(dataUrl)) throw new Error('Invalid embedded file; import cancelled');
+        const blob = await (await fetch(dataUrl)).blob();
+        if (blob.size > 50e6) throw new Error('Embedded file exceeds 50 MB');
+        put.push([id, blob]);
+      }
+      const fileIds = new Set(put.map(([id]) => id));
+      if ([...imported.nodes, ...imported.inbox].some(n => n.fileId && !fileIds.has(n.fileId))) throw new Error('Export is missing referenced files; import cancelled');
+      await stageChange('Replace workspace from export, including stored files. Export current data first to retain it.', () => {
+        for (const key of ['projects', 'nodes', 'edges', 'inbox', 'proposals']) state[key] = imported[key];
+        state.current = imported.projects.some(p => p.id === imported.current) ? imported.current : imported.projects[0].id;
+        state.selected = imported.nodes.some(n => n.id === imported.selected) ? imported.selected : null;
+      }, { clear: true, put });
+      location.hash = 'graph'; render();
+    } catch (error) { toast(error.message); }
   }
 
   // ---------- Start ----------
@@ -657,6 +757,7 @@
     let saved = null;
     try { saved = await store.get('state'); } catch { saved = null; }
     state = saved && saved.version === 1 && Array.isArray(saved.nodes) ? saved : sample();
+    store.lastSaved = saved ? changes.canonical(changes.snapshot(saved)) : null;
     if (!saved) save();
     bind();
     render();
