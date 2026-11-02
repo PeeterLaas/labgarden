@@ -38,6 +38,8 @@ Readable, framework-free files in `dist/`:
   - Export is JSON (`app: 'paivik'`, state, files as data URLs); import validates that shape before replacing everything.
 - `style.css`: design tokens on `:root`, redefined under `prefers-color-scheme: dark`; phone layout below 860px.
 
+A lab can host `dist/` with an optional `links.json` beside it (`[{name, url, note}]`), shown as "Lab services" in the sidebar. Never commit a `links.json`: internal addresses stay out of this public repository.
+
 Research mutations must use `stageChange()` and `dist/change-service.js`; do not add direct graph writes in event handlers. Capture intake, draft checkbox choices and graph layout are separate. The core binds approval to a proposal ID, revision, SHA-256 digest and expected workspace snapshot, then appends an audit event. Browser persistence writes state and file changes in one IndexedDB transaction and rejects stale writes from another tab.
 
 The optional local companion uses the same core through `server/workspace.cjs`. Its R tools expose read/draft operations only; do not expose approval, commit or discard as model tools. `app.R` is a single-owner localhost approval console. The local file store is an initial adapter, not multi-user authentication or automatic browser sync. Keep `.r-library`, `.deps` and `local-data` ignored and out of commits.

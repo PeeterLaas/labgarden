@@ -910,6 +910,23 @@
     } catch (error) { toast(error.message); }
   }
 
+  // ---------- Lab service links ----------
+  // Optional links.json exists only where a lab hosts this page, so internal addresses stay out of the public repository.
+  async function loadServiceLinks() {
+    if (location.hostname.endsWith('github.io')) return;
+    try {
+      const response = await fetch('links.json', { cache: 'no-store' });
+      if (!response.ok) return;
+      const links = await response.json();
+      const safe = (Array.isArray(links) ? links : []).filter(l => l && typeof l.name === 'string' && l.name && /^https?:\/\//i.test(l.url || ''));
+      if (!safe.length) return;
+      const box = $('#service-links');
+      box.innerHTML = '<p class="navlabel">Lab services</p>' + safe.map(l =>
+        `<a href="${esc(l.url)}" target="_blank" rel="noopener"${l.note ? ` title="${esc(l.note)}"` : ''}><span class="ico" aria-hidden="true">↗</span> ${esc(l.name)}</a>`).join('');
+      box.hidden = false;
+    } catch { /* Links are optional; the workspace works without them. */ }
+  }
+
   // ---------- Start ----------
   (async () => {
     const ok = await store.open();
@@ -921,5 +938,6 @@
     if (!saved) save();
     bind();
     render();
+    loadServiceLinks();
   })();
 })();
