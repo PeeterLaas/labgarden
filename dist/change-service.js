@@ -4,8 +4,8 @@
   else root.PaivikChanges = factory(root.crypto);
 })(typeof globalThis !== 'undefined' ? globalThis : this, function (crypto) {
   'use strict';
-  const collections = ['projects', 'nodes', 'edges', 'inbox', 'proposals'];
-  const types = new Set(['project', 'experiment', 'protocol', 'sample', 'dataset', 'observation', 'voice', 'photo', 'file', 'note']);
+  const collections = ['projects', 'nodes', 'edges', 'inbox', 'proposals', 'avatars'];
+  const types = new Set(['project', 'resource', 'experiment', 'protocol', 'checklist', 'sample', 'dataset', 'observation', 'voice', 'photo', 'file', 'note']);
   const clone = value => JSON.parse(JSON.stringify(value));
   const canonical = value => JSON.stringify(normalize(value));
   function normalize(value) {
@@ -24,12 +24,19 @@
   function validate(state) {
     check(state && state.version === 1, 'Unsupported workspace version');
     for (const key of collections) {
+      if (key === 'avatars' && state[key] === undefined) continue;
       check(Array.isArray(state[key]), `Missing ${key}`);
       const seen = new Set();
       for (const item of state[key]) {
         check(item && text(item.id, 160, true) && /^[A-Za-z0-9_-]+$/.test(item.id), `Invalid ${key} identifier`);
         check(!seen.has(item.id), `Duplicate ${key} identifier`); seen.add(item.id);
       }
+    }
+    for (const avatar of state.avatars || []) {
+      check(types.has(avatar.id), 'Unknown avatar category');
+      check(avatar.kind === 'emoji' || avatar.kind === 'image', 'Invalid avatar kind');
+      if (avatar.kind === 'emoji') check(text(avatar.value, 24, true) && !/[<>\x00-\x1f]/.test(avatar.value), 'Use a short emoji or initials for the avatar');
+      else check(text(avatar.value, 360000, true) && /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(avatar.value), 'Avatar must be a small embedded PNG, JPEG or WebP image');
     }
     check(state.projects.length > 0, 'At least one project is required');
     const projects = new Set(state.projects.map(p => p.id));
@@ -39,6 +46,17 @@
       check(projects.has(n.project) && types.has(n.type), 'Invalid record project or type');
       check(text(n.title, 120, true) && text(n.text, 20000), 'Invalid record title or description');
       check(Number.isFinite(n.x) && Number.isFinite(n.y), 'Invalid record position');
+      for (const key of ['protocolFamily', 'revision', 'platform', 'platformKey']) {
+        if (n[key] !== undefined) check(text(n[key], 160), `Invalid ${key}`);
+      }
+      if (n.revisionDate) check(/^\d{4}-\d{2}-\d{2}$/.test(n.revisionDate) && !Number.isNaN(Date.parse(n.revisionDate)) && new Date(n.revisionDate).toISOString().slice(0, 10) === n.revisionDate, 'Invalid revision date');
+      if (n.supersedes) {
+        const earlier = nodes.get(n.supersedes);
+        check(earlier && earlier.id !== n.id && ['protocol', 'checklist'].includes(n.type) && earlier.type === n.type, 'Invalid earlier protocol revision');
+        check((n.protocolFamily || n.id) === (earlier.protocolFamily || earlier.id) && (n.platformKey || n.platform || '') === (earlier.platformKey || earlier.platform || ''), 'Revision family and platform must match the earlier version');
+        const seen = new Set([n.id]); let current = earlier;
+        while (current) { check(!seen.has(current.id), 'Protocol revision history cannot contain a cycle'); seen.add(current.id); current = nodes.get(current.supersedes); }
+      }
     }
     for (const e of state.edges) {
       check(nodes.has(e.from) && nodes.has(e.to), 'A relationship refers to a missing record');
@@ -63,7 +81,7 @@
   }
   // Graph layout and view selection are presentation state, not scientific edits.
   function snapshot(state) {
-    return Object.fromEntries(collections.map(key => [key, state[key].map(item => {
+    return Object.fromEntries(collections.map(key => [key, (state[key] || []).map(item => {
       const value = clone(item);
       if (key === 'nodes') { delete value.x; delete value.y; }
       return value;
@@ -108,7 +126,7 @@
     const next = clone(state);
     for (const op of proposal.operations) {
       check(collections.includes(op.collection), 'Unsupported change operation');
-      const items = next[op.collection], index = items.findIndex(item => item.id === op.id);
+      const items = next[op.collection] || (next[op.collection] = []), index = items.findIndex(item => item.id === op.id);
       if (op.after === null) { check(index >= 0, 'Missing change target'); items.splice(index, 1); }
       else {
         check(op.after.id === op.id, 'Change identifier mismatch');

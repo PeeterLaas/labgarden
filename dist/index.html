@@ -23,6 +23,8 @@
       <a href="#graph" data-nav="graph"><span class="ico" aria-hidden="true">◉</span> Research graph <b id="count-graph">0</b></a>
       <a href="#inbox" data-nav="inbox"><span class="ico" aria-hidden="true">⌑</span> Capture inbox <b id="count-inbox">0</b></a>
       <a href="#review" data-nav="review"><span class="ico" aria-hidden="true">✓</span> Review changes <b id="count-review">0</b></a>
+      <a href="#library" data-nav="library"><span class="ico" aria-hidden="true">▤</span> Resources & protocols</a>
+      <a href="#avatars" data-nav="avatars"><span class="ico" aria-hidden="true">◈</span> Category avatars</a>
       <a href="#about" data-nav="about"><span class="ico" aria-hidden="true">i</span> About PAIvik</a>
     </nav>
 
@@ -60,6 +62,7 @@
         <a role="tab" href="#graph" data-tab="graph">Graph</a>
         <a role="tab" href="#inbox" data-tab="inbox">Inbox <span class="badge" id="tab-inbox">0</span></a>
         <a role="tab" href="#review" data-tab="review">Review changes <span class="badge" id="tab-review">0</span></a>
+        <a role="tab" href="#library" data-tab="library">Library</a>
       </div>
 
       <div class="panel" id="panel-graph">
@@ -97,6 +100,15 @@
           <button type="submit" class="send" aria-label="Add to inbox">↑</button>
         </div>
       </form>
+      <div class="panel library" id="panel-library" hidden>
+        <div class="library-actions"><button type="button" class="btn" id="add-minion">＋ Add MinION library</button><button type="button" class="link" id="attach-protocols">Attach source PDFs</button><input type="file" id="protocol-files" accept="application/pdf,.pdf" multiple hidden><input type="file" id="record-attachment" accept="application/pdf,.pdf" hidden></div>
+        <p class="note">Protocols are version stacks: newest dated revision in your library first. MinION and Flongle stay separate. Full protocols and matching checklists can share a revision. This is not a check for the manufacturer's latest release.</p>
+        <div id="resource-list"></div><div id="protocol-stacks"></div><div id="reference-notes"></div>
+      </div>
+      <div class="panel" id="panel-avatars" hidden>
+        <h2>Find your way by category</h2><p class="note">Give each category an emoji, initials or a picture. The same avatar appears on its graph nodes, records and suggestions. Labels remain visible.</p>
+        <div id="avatar-list" class="avatar-grid"></div><input type="file" id="avatar-image-input" accept="image/png,image/jpeg,image/webp" hidden>
+      </div>
     </section>
 
     <section class="view about" id="view-about" hidden>
@@ -141,6 +153,7 @@
 </dialog>
 
 <script src="change-service.js"></script>
+<script src="resource-library.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
