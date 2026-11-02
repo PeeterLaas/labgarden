@@ -22,7 +22,10 @@ async function execute(db, request, owner = 'local-user') {
     if (!n) throw new Error('Record not found');
     return { record: n, relationships: db.state.edges.filter(e => e.from === n.id || e.to === n.id) };
   }
-  if (action === 'list') return db.drafts.filter(d => !d.status).map(d => ({ id: d.id, revision: d.revision, reason: d.reason, created: d.created }));
+  if (action === 'list') {
+    const base = await changes.hash(changes.snapshot(db.state));
+    return db.drafts.filter(d => !d.status).map(d => ({ id: d.id, revision: d.revision, reason: d.reason, created: d.created, stale: d.baseHash !== base }));
+  }
   if (action === 'preview') {
     const d = db.drafts.find(d => d.id === request.id && !d.status);
     if (!d) throw new Error('Pending proposal not found');
@@ -66,7 +69,18 @@ async function execute(db, request, owner = 'local-user') {
     // A status field would invalidate the proposal hash; keep the original immutable.
     db.state = await changes.commit(db.state, p, request.confirmation, owner);
     db.drafts.splice(index, 1);
-    return { committed: p.id, audit: db.state.audit.at(-1) };
+    // A commit changes the workspace, so drafts prepared against the old one can never commit. Report what was cleared.
+    const base = await changes.hash(changes.snapshot(db.state));
+    const outdated = db.drafts.filter(d => d.baseHash !== base);
+    db.drafts = db.drafts.filter(d => d.baseHash === base);
+    return { committed: p.id, audit: db.state.audit.at(-1), removedOutdated: outdated.map(d => ({ id: d.id, reason: d.reason })) };
+  }
+  // Human review decision, reachable from the Shiny console only. Never register this as a model tool.
+  if (action === 'discard') {
+    const index = db.drafts.findIndex(d => d.id === request.id && !d.status);
+    if (index < 0) throw new Error('Pending proposal not found');
+    const [removed] = db.drafts.splice(index, 1);
+    return { discarded: removed.id, reason: removed.reason };
   }
   throw new Error('Unsupported workspace action');
 }
@@ -81,7 +95,7 @@ async function run(file, request, owner) {
     fs.writeFileSync(fd, String(process.pid));
     const db = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : initial();
     const result = await execute(db, request, owner);
-    if (['draft_update', 'draft_observation', 'draft_import', 'commit'].includes(request.action)) {
+    if (['draft_update', 'draft_observation', 'draft_import', 'commit', 'discard'].includes(request.action)) {
       const tmp = `${file}.${randomUUID()}.tmp`;
       try {
         const out = fs.openSync(tmp, 'wx', 0o600);
