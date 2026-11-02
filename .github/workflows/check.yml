@@ -29,6 +29,8 @@ jobs:
         with:
           use-public-rspm: true
       - name: Install R tool dependencies
+        env:
+          GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
         run: Rscript -e 'install.packages(c("shiny", "ellmer", "jsonlite", "remotes")); remotes::install_github("JamesHWade/shinymcp@0476fcf54a66bf82b0d8a1c0ab3bc516629b0a6b", dependencies = NA, upgrade = "never")'
       - run: Rscript tests/integration.R
       - run: node tests/mcp-stdio.cjs
