@@ -26,6 +26,7 @@ jobs:
           python-version: '3.x'
       - run: node --check dist/app.js
       - run: node --check dist/change-service.js
+      - run: node --check dist/resource-library.js
       - run: node --test tests/*.test.cjs
       - run: python3 scripts/check_assets.py
       - uses: actions/configure-pages@v5

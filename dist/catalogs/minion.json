@@ -1,0 +1,339 @@
+{
+  "id": "minion-sequencer",
+  "title": "MinION Sequencer",
+  "schemaVersion": 1,
+  "documents": [
+    {
+      "id": "adaptive-sampling",
+      "title": "Adaptive sampling guidance",
+      "type": "note",
+      "documentKind": "reference",
+      "revision": "ADS_S1016_v1_revN_05Sep2025",
+      "revisionDate": "2025-09-05",
+      "platform": "MinION / computational guidance",
+      "kits": [],
+      "description": "Reference guide covering adaptive sampling setup, target files, software dialogs and troubleshooting. This is not a wet-lab library preparation protocol.",
+      "sourceFile": "adaptive-sampling-document-document-en-ADS_S1016_v1_revN_05Sep2025-14.pdf",
+      "aliases": [
+        "adaptive-sampling-document-document-en-ADS_S1016_v1_revN_05Sep2025-14.pdf"
+      ],
+      "sha256": "1f03aba98a3f5866dc4caa0509de6c43a1b33a7fe7f1375659bdc8c783a8f703",
+      "pages": 43,
+      "size": 2409805,
+      "sourcePage": 1,
+      "publisher": "Oxford Nanopore Technologies",
+      "protocolFamily": "adaptive-sampling",
+      "platformKey": "minion"
+    },
+    {
+      "id": "ligation-dna-checklist",
+      "title": "Ligation DNA V14 — MinION checklist",
+      "type": "checklist",
+      "documentKind": "checklist",
+      "revision": "GDE_9161_v114_revAC_24Sep2025",
+      "revisionDate": "2025-09-24",
+      "platform": "MinION",
+      "kits": [
+        "SQK-LSK114"
+      ],
+      "description": "Companion checklist for the MinION genomic DNA ligation protocol. Keep the full protocol and this checklist linked to the same recorded revision.",
+      "sourceFile": "CHECKLIST-genomic-dna-by-ligation-sqk-lsk114-MinION-en-GDE_9161_v114_revAC_24Sep2025-67.pdf",
+      "aliases": [
+        "CHECKLIST-genomic-dna-by-ligation-sqk-lsk114-MinION-en-GDE_9161_v114_revAC_24Sep2025-67.pdf"
+      ],
+      "sha256": "e6dd2bd4c8b5d407a06b417699d211b904569ff429e42a8525a7a2b16f692152",
+      "pages": 14,
+      "size": 276543,
+      "sourcePage": 1,
+      "publisher": "Oxford Nanopore Technologies",
+      "protocolFamily": "ligation-dna",
+      "platformKey": "minion"
+    },
+    {
+      "id": "direct-rna",
+      "title": "Direct RNA sequencing — SQK-RNA004",
+      "type": "protocol",
+      "documentKind": "protocol",
+      "revision": "DRS_9195_v4_revH_16May2025",
+      "revisionDate": "2025-05-16",
+      "platform": "MinION",
+      "kits": [
+        "SQK-RNA004"
+      ],
+      "description": "Native RNA sequencing protocol. Its opening page specifies RNA flow cells. Keep RNA and DNA workflows distinct.",
+      "sourceFile": "direct-rna-sequencing-sqk-rna004-document-document-MinION-en-DRS_9195_v4_revH_16May2025-27.pdf",
+      "aliases": [
+        "direct-rna-sequencing-sqk-rna004-document-document-MinION-en-DRS_9195_v4_revH_16May2025-27.pdf"
+      ],
+      "sha256": "8627627a4e0fb4449f7dc01787e5b80bbe8edecb7090760974308f5a36de3a39",
+      "pages": 36,
+      "size": 1874742,
+      "sourcePage": 1,
+      "publisher": "Oxford Nanopore Technologies",
+      "protocolFamily": "direct-rna",
+      "platformKey": "minion"
+    },
+    {
+      "id": "rapid-flongle",
+      "title": "Rapid barcoding DNA V14 — Flongle",
+      "type": "protocol",
+      "documentKind": "protocol",
+      "revision": "RBK_9176_v114_revS_27Oct2025",
+      "revisionDate": "2025-10-27",
+      "platform": "Flongle",
+      "kits": [
+        "SQK-RBK114.24",
+        "SQK-RBK114.96"
+      ],
+      "description": "Flongle-specific rapid barcoding document. Its header is revision S, distinct from the supplied MinION revision R.",
+      "sourceFile": "FLONGLE Rapid sequencing DNA V14 - barcoding (SQK-RBK114.24 or SQK-RBK114.96).pdf",
+      "aliases": [
+        "FLONGLE Rapid sequencing DNA V14 - barcoding (SQK-RBK114.24 or SQK-RBK114.96).pdf"
+      ],
+      "sha256": "032f22d3a015533a05da678cdafab9eb358fc23a6a4a7b6c1eb141af3f9d6552",
+      "pages": 40,
+      "size": 6869026,
+      "sourcePage": 1,
+      "publisher": "Oxford Nanopore Technologies",
+      "protocolFamily": "rapid-barcoding",
+      "platformKey": "flongle"
+    },
+    {
+      "id": "wash",
+      "title": "Flow Cell Wash Kit — EXP-WSH004",
+      "type": "protocol",
+      "documentKind": "maintenance",
+      "revision": "WFC_9120_v1_revQ_08Dec2020",
+      "revisionDate": "2020-12-08",
+      "platform": "MinION / GridION",
+      "kits": [
+        "EXP-WSH004",
+        "EXP-WSH004-XL"
+      ],
+      "description": "Maintenance reference for washing MinION/GridION flow cells. Source revision is retained as printed; compatibility must be checked for the actual flow cell and library.",
+      "sourceFile": "flow-cell-wash-kit-exp-wsh004-document-document-MinION-en-WFC_9120_v1_revQ_08Dec2020-23-1.pdf",
+      "aliases": [
+        "flow-cell-wash-kit-exp-wsh004-document-document-MinION-en-WFC_9120_v1_revQ_08Dec2020-23-1.pdf"
+      ],
+      "sha256": "6039e2b6ec6e4b27aad0d0036153964bb3ad761cbaea8f102c3f5d48651d23f8",
+      "pages": 33,
+      "size": 2434176,
+      "sourcePage": 1,
+      "publisher": "Oxford Nanopore Technologies",
+      "protocolFamily": "flow-cell-wash",
+      "platformKey": "minion"
+    },
+    {
+      "id": "ligation-dna",
+      "title": "Ligation DNA V14 — MinION",
+      "type": "protocol",
+      "documentKind": "protocol",
+      "revision": "GDE_9161_v114_revAC_24Sep2025",
+      "revisionDate": "2025-09-24",
+      "platform": "MinION",
+      "kits": [
+        "SQK-LSK114"
+      ],
+      "description": "Full MinION genomic DNA ligation protocol, linked to the matching supplied checklist.",
+      "sourceFile": "genomic-dna-by-ligation-sqk-lsk114-document-document-MinION-en-GDE_9161_v114_revAC_24Sep2025-67.pdf",
+      "aliases": [
+        "genomic-dna-by-ligation-sqk-lsk114-document-document-MinION-en-GDE_9161_v114_revAC_24Sep2025-67.pdf"
+      ],
+      "sha256": "1aa7f41bbc7eafe4ed92c64328e4e43a6eacce025f449ad2dcc0bf4489ff959c",
+      "pages": 40,
+      "size": 1830634,
+      "sourcePage": 1,
+      "publisher": "Oxford Nanopore Technologies",
+      "protocolFamily": "ligation-dna",
+      "platformKey": "minion"
+    },
+    {
+      "id": "ligation-amplicons-flongle",
+      "title": "Ligation amplicons V14 — Flongle",
+      "type": "protocol",
+      "documentKind": "protocol",
+      "revision": "ACDE_9163_v114_revAB_24Sep2025",
+      "revisionDate": "2025-09-24",
+      "platform": "Flongle",
+      "kits": [
+        "SQK-LSK114"
+      ],
+      "description": "Flongle-specific amplicon ligation protocol. Do not silently substitute the supplied MinION checklist for these platform-specific instructions.",
+      "sourceFile": "Ligation sequencing amplicons V14 (SQK-LSK114)_FLONGLE.pdf",
+      "aliases": [
+        "Ligation sequencing amplicons V14 (SQK-LSK114)_FLONGLE.pdf"
+      ],
+      "sha256": "d85266defe0db8076795ecfe4d9a986d9c012d6b4efc9d4ccd3ce01a907c4ef7",
+      "pages": 37,
+      "size": 6425777,
+      "sourcePage": 1,
+      "publisher": "Oxford Nanopore Technologies",
+      "protocolFamily": "ligation-amplicons",
+      "platformKey": "flongle"
+    },
+    {
+      "id": "ligation-dna-web-export",
+      "title": "Ligation DNA V14 — alternate MinION export",
+      "type": "protocol",
+      "documentKind": "alternate export",
+      "revision": "GDE_9161_v114_revAC_24Sep2025",
+      "revisionDate": "2025-09-24",
+      "platform": "MinION",
+      "kits": [
+        "SQK-LSK114"
+      ],
+      "description": "The filename mentions FLONGLE, but the document heading says MINION and its contents include MinION/GridION loading. Cataloged by the document heading; platform requires researcher review.",
+      "sourceFile": "Ligation sequencing DNA V14 (SQK-LSK114 plus FLONGLE).pdf",
+      "aliases": [
+        "Ligation sequencing DNA V14 (SQK-LSK114 plus FLONGLE).pdf"
+      ],
+      "sha256": "3c28a6d43e10d7cb200c032d8f171c87465ce33f0e9d3bd9b0ea38e9e4fc3a84",
+      "pages": 38,
+      "size": 4005697,
+      "sourcePage": 1,
+      "publisher": "Oxford Nanopore Technologies",
+      "protocolFamily": "ligation-dna",
+      "platformKey": "minion"
+    },
+    {
+      "id": "ligation-amplicons-checklist",
+      "title": "Ligation amplicons V14 — MinION checklist",
+      "type": "checklist",
+      "documentKind": "checklist",
+      "revision": "ACDE_9163_v114_revAB_24Sep2025",
+      "revisionDate": "2025-09-24",
+      "platform": "MinION",
+      "kits": [
+        "SQK-LSK114"
+      ],
+      "description": "MinION amplicon ligation checklist. The supplied full amplicon protocol is Flongle-specific, so it remains a separate platform record.",
+      "sourceFile": "ligation-sequencing-amplicons-sqk-lsk114-document-checklist-MinION-en-ACDE_9163_v114_revAB_24Sep2025-47.pdf",
+      "aliases": [
+        "ligation-sequencing-amplicons-sqk-lsk114-document-checklist-MinION-en-ACDE_9163_v114_revAB_24Sep2025-47.pdf"
+      ],
+      "sha256": "2f67e935ef56f12d13fd4a39fe95f51375d93149e99345f5ce25384290762e07",
+      "pages": 13,
+      "size": 271345,
+      "sourcePage": 1,
+      "publisher": "Oxford Nanopore Technologies",
+      "protocolFamily": "ligation-amplicons",
+      "platformKey": "minion"
+    },
+    {
+      "id": "poly-a",
+      "title": "Poly(A) tail length — older-kit requirements",
+      "type": "note",
+      "documentKind": "requirements",
+      "revision": null,
+      "revisionDate": null,
+      "platform": "RNA / cDNA reference",
+      "kits": [
+        "SQK-RNA002",
+        "SQK-PCS111",
+        "SQK-PCB111.24"
+      ],
+      "description": "The title names RNA002 and older cDNA kits, not RNA004. Keep as background reference; applicability to RNA004 is unverified. Two supplied filenames are byte-identical.",
+      "sourceFile": "poly-a-tail-length-requirements-document-en-10.pdf",
+      "aliases": [
+        "poly-a-tail-length-requirements-document-en-10-1.pdf",
+        "poly-a-tail-length-requirements-document-en-10.pdf"
+      ],
+      "sha256": "e86bbaf3504806d49118ab5237d3c6676f3d058e66d81ff4e08290855c043cc8",
+      "pages": 5,
+      "size": 571910,
+      "sourcePage": 1,
+      "publisher": "Oxford Nanopore Technologies",
+      "protocolFamily": "poly-a-requirements",
+      "platformKey": "reference"
+    },
+    {
+      "id": "rapid-checklist",
+      "title": "Rapid barcoding DNA V14 — MinION checklist",
+      "type": "checklist",
+      "documentKind": "checklist",
+      "revision": "RBK_9176_v114_revR_04Jun2025",
+      "revisionDate": "2025-06-04",
+      "platform": "MinION",
+      "kits": [
+        "SQK-RBK114.24",
+        "SQK-RBK114.96"
+      ],
+      "description": "Checklist for the supplied MinION rapid barcoding revision R. Its printed Last update field differs from the revision date; preserve the revision identifier as the primary version label.",
+      "sourceFile": "rapid-sequencing-gdna-barcoding-sqk-rbk114-document-checklist-MinION-en-RBK_9176_v114_revR_04Jun2025-33.pdf",
+      "aliases": [
+        "rapid-sequencing-gdna-barcoding-sqk-rbk114-document-checklist-MinION-en-RBK_9176_v114_revR_04Jun2025-33.pdf"
+      ],
+      "sha256": "3f647d231ae01d77a750b433fded50042b1b620e94abd1ea591a738a7e33487c",
+      "pages": 11,
+      "size": 380423,
+      "sourcePage": 1,
+      "publisher": "Oxford Nanopore Technologies",
+      "protocolFamily": "rapid-barcoding",
+      "platformKey": "minion"
+    },
+    {
+      "id": "rapid-minion",
+      "title": "Rapid barcoding DNA V14 — MinION",
+      "type": "protocol",
+      "documentKind": "protocol",
+      "revision": "RBK_9176_v114_revR_04Jun2025",
+      "revisionDate": "2025-06-04",
+      "platform": "MinION",
+      "kits": [
+        "SQK-RBK114.24",
+        "SQK-RBK114.96"
+      ],
+      "description": "Full MinION rapid barcoding protocol revision R, linked to the matching supplied checklist.",
+      "sourceFile": "rapid-sequencing-gdna-barcoding-sqk-rbk114-document-document-MinION-en-RBK_9176_v114_revR_04Jun2025-33.pdf",
+      "aliases": [
+        "rapid-sequencing-gdna-barcoding-sqk-rbk114-document-document-MinION-en-RBK_9176_v114_revR_04Jun2025-33.pdf"
+      ],
+      "sha256": "6dca717a31625911f83330e6ce58e96e63dffee061b0052d67aaa61be1fbf9b1",
+      "pages": 38,
+      "size": 2304613,
+      "sourcePage": 1,
+      "publisher": "Oxford Nanopore Technologies",
+      "protocolFamily": "rapid-barcoding",
+      "platformKey": "minion"
+    },
+    {
+      "id": "pathogen-overview",
+      "title": "Pathogen metagenomics — workflow overview",
+      "type": "note",
+      "documentKind": "workflow overview",
+      "revision": null,
+      "revisionDate": null,
+      "platform": "Workflow reference",
+      "kits": [],
+      "description": "High-level manufacturer workflow overview for pathogen metagenomics. Stored as supporting context rather than a complete experiment protocol.",
+      "sourceFile": "workflow-overview-pathogen-metagenomics.pdf",
+      "aliases": [
+        "workflow-overview-pathogen-metagenomics.pdf"
+      ],
+      "sha256": "4841fc81d69775b5d7a500f857c6d3bda1409dae9fba7c3bb3e586fe5eeedf63",
+      "pages": 2,
+      "size": 509498,
+      "sourcePage": 1,
+      "publisher": "Oxford Nanopore Technologies",
+      "protocolFamily": "pathogen-metagenomics",
+      "platformKey": "reference"
+    }
+  ],
+  "notes": [
+    {
+      "id": "platform-review",
+      "title": "Platform and revision review",
+      "text": "MinION and Flongle are recorded separately. The supplied rapid barcoding documents have different revisions (MinION R and Flongle S). The alternate ligation DNA export is headed MinION despite FLONGLE in its filename. Choose the exact platform and revision before an experiment; catalog association is not a compatibility approval."
+    },
+    {
+      "id": "source-deduplication",
+      "title": "Source copies and duplicates",
+      "text": "The 14 supplied filenames represent 13 distinct PDF byte streams. The two poly(A) requirement files have the same SHA-256 and share one reference record with both filename aliases. The two MinION DNA ligation exports have different byte streams and remain separate source records."
+    },
+    {
+      "id": "rna-reference-review",
+      "title": "RNA reference scope",
+      "text": "The direct RNA protocol is SQK-RNA004. The poly(A) requirements note names SQK-RNA002, SQK-PCS111 and SQK-PCB111.24; it is linked as older-kit background, not as validated RNA004 guidance. Verify applicability before use."
+    }
+  ]
+}

@@ -10,12 +10,15 @@
   const size = (b) => (b > 1e6 ? `${(b / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1e3))} kB`);
   const W = 800, H = 420;
   const changes = window.PaivikChanges;
+  const library = window.PaivikLibrary;
 
   // ---------- Record types and icons ----------
   const TYPES = {
     project: { label: 'Project', kind: 'rec', icon: 'folder', r: 30 },
+    resource: { label: 'Resource', kind: 'hub', icon: 'grid', r: 38 },
     experiment: { label: 'Experiment', kind: 'hub', icon: 'flask', r: 40 },
     protocol: { label: 'Protocol', kind: 'rec', icon: 'list', r: 30 },
+    checklist: { label: 'Checklist', kind: 'rec', icon: 'list', r: 28 },
     sample: { label: 'Sample', kind: 'rec', icon: 'tube', r: 26 },
     dataset: { label: 'Dataset', kind: 'rec', icon: 'grid', r: 30 },
     observation: { label: 'Observation', kind: 'evi', icon: 'eye', r: 24 },
@@ -36,7 +39,16 @@
     file: 'M6 3h8l4 4v14H6zM14 3v4h4',
     note: 'M5 4h14v16H5zM8 9h8M8 13h8M8 17h5',
   };
-  const icon = (type) => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${ICONS[(TYPES[type] || TYPES.file).icon]}"/></svg>`;
+  const defaultAvatars = { project: '🗂️', resource: '🔬', experiment: '🧪', protocol: '📋', checklist: '☑️', sample: '🧫', dataset: '📊', observation: '👁️', voice: '🎙️', photo: '📷', file: '📄', note: '📝' };
+  const avatarFor = type => (state?.avatars || []).find(a => a.id === type) || { kind: 'emoji', value: defaultAvatars[type] || '📄' };
+  const icon = type => {
+    const avatar = avatarFor(type);
+    return avatar.kind === 'image' ? `<img class="category-avatar" src="${esc(avatar.value)}" alt="">` : `<span class="category-avatar" aria-hidden="true">${esc(avatar.value)}</span>`;
+  };
+  const graphAvatar = (type, x, y, size) => {
+    const avatar = avatarFor(type);
+    return avatar.kind === 'image' ? `<image href="${esc(avatar.value)}" x="${x-size/2}" y="${y-size/2}" width="${size}" height="${size}" preserveAspectRatio="xMidYMid meet"/>` : `<text class="avatar-glyph" x="${x}" y="${y}" font-size="${size}" text-anchor="middle" dominant-baseline="central">${esc(avatar.value)}</text>`;
+  };
   const kindOf = (type) => (TYPES[type] || TYPES.file).kind;
 
   // ---------- Storage: IndexedDB, with an in-memory fallback ----------
@@ -195,6 +207,7 @@
   let saveTimer;
   let persistence = Promise.resolve();
   let reviewing = false;
+  let attachmentTarget = null;
   const urls = new Map();
   function persist(next, files) {
     const task = persistence.then(() => store.persist(next, files));
@@ -257,9 +270,12 @@
       state = desired;
       try { mutate(); } finally { state = original; }
       const proposal = await changes.prepare(state, desired, { reason });
+      const showValue = value => {
+        const image = value?.kind === 'image' ? `<img class="avatar-review" src="${esc(value.value)}" alt="Category avatar preview">` : '';
+        return `${image}<pre>${esc(JSON.stringify(value, (key, v) => key === 'value' && typeof v === 'string' && v.startsWith('data:image/') ? '[Embedded image shown above]' : v, 2))}</pre>`;
+      };
       const summary = proposal.operations.map(op => `<li><strong>${esc(op.collection)}: ${esc(op.id)}</strong>` +
-        `<div>Before</div><pre>${esc(JSON.stringify(op.before, null, 2))}</pre>` +
-        `<div>After</div><pre>${esc(JSON.stringify(op.after, null, 2))}</pre></li>`).join('');
+        `<div>Before</div>${showValue(op.before)}<div>After</div>${showValue(op.after)}</li>`).join('');
       const approval = await ask({ title: 'Confirm research changes', ok: 'Confirm and commit', body:
         `<p>${esc(reason)}</p><p>Review the exact additions, edits and removals below. Cancel leaves research records unchanged.</p>` +
         `<details open><summary>${proposal.operations.length} changes · revision ${proposal.revision}</summary><ol class="change-preview">${summary}</ol></details>` +
@@ -282,7 +298,7 @@
   }
 
   // ---------- Routing ----------
-  const VIEWS = ['graph', 'inbox', 'review', 'about'];
+  const VIEWS = ['graph', 'inbox', 'review', 'library', 'avatars', 'about'];
   const view = () => (VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'graph');
 
   // ---------- Rendering ----------
@@ -295,7 +311,9 @@
     $('#view-about').hidden = v !== 'about';
     $$('[data-nav]').forEach((a) => a.classList.toggle('active', a.dataset.nav === v));
     $$('[data-tab]').forEach((a) => { a.classList.toggle('active', a.dataset.tab === v); a.setAttribute('aria-selected', a.dataset.tab === v); });
-    ['graph', 'inbox', 'review'].forEach((k) => { $(`#panel-${k}`).hidden = k !== v; });
+    ['graph', 'inbox', 'review', 'library', 'avatars'].forEach((k) => { $(`#panel-${k}`).hidden = k !== v; });
+    $('#capture').hidden = v === 'library' || v === 'avatars';
+    $('#new-record').hidden = v === 'avatars';
 
     const inboxN = state.inbox.filter((c) => c.project === state.current && c.status === 'pending').length;
     const reviewN = pending().length;
@@ -307,12 +325,14 @@
 
     $('#project-list').innerHTML = state.projects.map((pr) => {
       const n = state.proposals.filter((r) => r.project === pr.id && r.status === 'pending').length;
-      return `<li><button type="button" data-project="${pr.id}" class="${pr.id === state.current ? 'active' : ''}"><span class="pdot"></span>${esc(pr.name)}${n ? `<span class="n" title="${n} waiting for review">${n}</span>` : ''}</button></li>`;
+      return `<li><button type="button" data-project="${pr.id}" class="${pr.id === state.current ? 'active' : ''}"><span class="project-avatar">${icon('project')}</span>${esc(pr.name)}${n ? `<span class="n" title="${n} waiting for review">${n}</span>` : ''}</button></li>`;
     }).join('');
 
     if (v === 'graph') { renderGraph(); renderDetail(); }
     if (v === 'inbox') renderInbox();
     if (v === 'review') renderReview();
+    if (v === 'library') renderLibrary();
+    if (v === 'avatars') renderAvatars();
   }
 
   function renderGraph() {
@@ -337,7 +357,7 @@
       return `<g class="node ${t.kind}${n.id === state.selected ? ' selected' : ''}" data-id="${n.id}" tabindex="0" role="button" aria-label="${esc(n.title)}, ${t.label}">` +
         `<circle class="ring" cx="${n.x}" cy="${n.y}" r="${r + 7}"/>` +
         `<circle class="body" cx="${n.x}" cy="${n.y}" r="${r}"/>` +
-        `<g class="icon" transform="translate(${n.x - 12 * sc} ${n.y - 12 * sc}) scale(${sc})"><path d="${ICONS[t.icon]}"/></g>` +
+        graphAvatar(n.type, n.x, n.y, r * 0.85) +
         `<text class="nlabel" x="${n.x}" y="${n.y + r + 18}">${esc(label)}</text>` +
         `<text class="ntype" x="${n.x}" y="${n.y + r + 31}">${t.label}</text></g>`;
     }).join('');
@@ -359,7 +379,8 @@
         .map((l) => l.split(/[,\t;]/).slice(0, 8));
       inner = `<table>${rows.map((r, i) => `<tr>${r.map((c) => (i ? `<td>${esc(c)}</td>` : `<th>${esc(c)}</th>`)).join('')}</tr>`).join('')}</table>`;
     }
-    return `<div class="preview">${inner}</div><a class="link" href="${url}" download="${esc(n.title)}">Download ${esc(n.title)} (${size(blob.size)})</a>`;
+    const open = mime === 'application/pdf' ? `<a class="link" href="${url}" target="_blank" rel="noopener">Open source PDF ↗</a> · ` : '';
+    return `<div class="preview">${inner}</div>${open}<a class="link" href="${url}" download="${esc(n.source?.file || n.title)}">Download ${esc(n.source?.file || n.title)} (${size(blob.size)})</a>`;
   }
 
   async function renderDetail() {
@@ -374,16 +395,20 @@
       const phrase = e.from === n.id ? e.label : `← ${e.label}`;
       return `<span class="chip" data-goto="${other.id}"><i>${esc(phrase)}</i> ${esc(other.title)} <button type="button" class="x" data-unlink="${e.id}" aria-label="Remove link to ${esc(other.title)}">×</button></span>`;
     }).join('');
-    const origin = { sample: 'Sample record', capture: 'Accepted from review', manual: 'Added by you' }[n.origin] || '';
+    const origin = { sample: 'Sample record', capture: 'Accepted from review', manual: 'Added by you', library: 'Added from resource library' }[n.origin] || '';
     box.innerHTML = `<div class="dicon ${t.kind === 'evi' ? 'evi' : ''}">${icon(n.type)}</div>
       <div><h2>${esc(n.title)}</h2>
         <p class="meta">${t.label} · ${when(n.created)}</p>
+        ${n.revision || n.platform ? `<p class="meta">${esc(n.platform || 'Platform not recorded')} · ${esc(n.revision || 'Revision not recorded')}</p>` : ''}
         ${n.text ? `<p class="text">${esc(n.text)}</p>` : ''}
+        ${n.source ? `<details class="source-meta"><summary>Source document · ${esc(n.documentKind || 'reference')}${n.source.pages ? ` · ${Number(n.source.pages)} pages` : ''}</summary><p>${esc(n.source.file)}</p><p>${n.source.page ? `Recorded from source page ${Number(n.source.page)}. ` : ''}PDF ${n.fileId ? 'attached locally' : 'not attached yet — use Attach source PDF'}.</p><p class="digest">SHA-256: ${esc(n.source.sha256)}</p></details>` : ''}
         <div id="detail-file"></div>
         <div class="rels">${rels || '<span class="meta">Not connected yet.</span>'}</div>
         <div class="dactions">
           <button type="button" class="link" data-act="edit">Edit</button>
           <button type="button" class="link" data-act="link">Link to…</button>
+          ${n.type === 'protocol' || n.type === 'checklist' ? '<button type="button" class="link" data-act="revision">New revision…</button>' : ''}
+          ${['protocol','checklist','note'].includes(n.type) ? '<button type="button" class="link" data-act="attach">Attach source PDF…</button>' : ''}
           ${n.type === 'project' ? '' : '<button type="button" class="link danger" data-act="delete">Delete</button>'}
         </div></div>
       <span class="status">${origin === 'Sample record' ? origin : `✓ ${origin}`}</span>`;
@@ -432,6 +457,34 @@
     $('#history-list').innerHTML = done.map(event => `<li>${esc(event.reason)} · ${esc(event.actor)} · ${esc(event.method)} · ${when(event.at)}<details><summary>Approved changes</summary><pre>${esc(JSON.stringify(event.operations, null, 2))}</pre></details></li>`).join('');
   }
 
+  function renderLibrary() {
+    const records = nodesHere();
+    const resources = records.filter(n => n.type === 'resource');
+    $('#resource-list').innerHTML = resources.length ? '<h2>Resources</h2><div class="resource-grid">' + resources.map(n =>
+      `<button type="button" class="resource-card" data-goto="${n.id}">${icon(n.type)}<strong>${esc(n.title)}</strong><span>${esc(n.resourceKind || 'resource')}</span></button>`).join('') + '</div>' : '<p class="blank">No resources in this project yet. Add the MinION library or create a resource record.</p>';
+    $('#protocol-stacks').innerHTML = '<h2>Protocol version stacks</h2>' + library.stacks(records).map(group =>
+      `<article class="protocol-stack"><h3>${esc(group.title)}</h3><p class="meta">${esc(group.platform)} · ${group.versions.length} recorded revision${group.versions.length === 1 ? '' : 's'}</p>` +
+      group.versions.map((v, i) => `<details${i === 0 ? ' open' : ''}><summary>${esc(v.revision.startsWith('unversioned:') ? 'Revision not recorded' : v.revision)} ${v.latestKnown ? '<span class="tag new">Newest in library</span>' : ''} ${v.date ? `<time>${esc(v.date)}</time>` : ''}</summary>` +
+        `<ul>${v.records.map(n => `<li><button class="link record-link" type="button" data-goto="${n.id}">${icon(n.type)} ${esc(n.title)}</button><span class="tag">${esc(n.documentKind || TYPES[n.type].label)}</span><span class="meta">${n.fileId ? 'PDF attached' : n.source ? 'Source PDF not attached' : 'No source PDF'}</span></li>`).join('')}</ul></details>`).join('') + '</article>').join('');
+    $('#reference-notes').innerHTML = '<h2>Supporting notes</h2><ul class="library-notes">' + records.filter(n => n.type === 'note').map(n => `<li><button class="link record-link" type="button" data-goto="${n.id}">${icon(n.type)} ${esc(n.title)}</button><p>${esc(n.text)}</p></li>`).join('') + '</ul>';
+  }
+
+  function renderAvatars() {
+    $('#avatar-list').innerHTML = Object.entries(TYPES).map(([type, definition]) => {
+      const avatar = avatarFor(type), custom = (state.avatars || []).some(a => a.id === type);
+      return `<article class="avatar-card"><div class="avatar-card-head">${icon(type)}<h3>${definition.label}</h3></div>` +
+        `<form data-avatar-form="${type}"><label for="avatar-${type}">Emoji or initials<input id="avatar-${type}" name="avatar" maxlength="24" required value="${esc(avatar.kind === 'emoji' ? avatar.value : defaultAvatars[type])}"></label><button class="btn" type="submit">Review avatar</button></form>` +
+        `<button class="link" type="button" data-avatar-image="${type}">Choose picture…</button>${custom ? `<button class="link" type="button" data-avatar-reset="${type}">Restore default</button>` : ''}</article>`;
+    }).join('');
+  }
+
+  const versionFields = n => `<details${n?.revision || n?.protocolFamily ? ' open' : ''}><summary>Protocol version and platform</summary>
+    <label>Protocol family<input name="family" maxlength="120" value="${esc(n?.protocolFamily || '')}" placeholder="e.g. rapid-barcoding"></label>
+    <label>Revision identifier<input name="revision" maxlength="160" value="${esc(n?.revision || '')}"></label>
+    <label>Revision date<input type="date" name="revisionDate" value="${esc(n?.revisionDate || '')}"></label>
+    <label>Platform<select name="platform"><option value="">Not recorded</option><option value="minion"${n?.platformKey === 'minion' ? ' selected' : ''}>MinION</option><option value="flongle"${n?.platformKey === 'flongle' ? ' selected' : ''}>Flongle</option><option value="other"${n?.platformKey === 'other' ? ' selected' : ''}>Other</option></select></label></details>`;
+  const readVersionFields = f => ({ protocolFamily: f.get('family')?.trim() || '', revision: f.get('revision')?.trim() || '', revisionDate: f.get('revisionDate') || '', platformKey: f.get('platform') || '', platform: ({minion:'MinION',flongle:'Flongle',other:'Other'})[f.get('platform')] || '' });
+
   // ---------- Graph mutations ----------
   function place(n, near = []) {
     const pts = near.map(node).filter(Boolean);
@@ -472,11 +525,91 @@
   // ---------- Events ----------
   function bind() {
     window.addEventListener('hashchange', render);
+    $('#add-minion').addEventListener('click', async () => {
+      try {
+        const response = await fetch('catalogs/minion.json');
+        if (!response.ok) throw new Error('Could not load the MinION catalog');
+        const catalog = await response.json();
+        await stageChange('Add MinION Sequencer, its protocol versions, source references and catalog notes. Existing records stay.', () => {
+          const planned = library.install(state, catalog);
+          Object.assign(state, planned);
+        });
+        location.hash = 'library'; render();
+      } catch (error) { toast(error.message); }
+    });
+    $('#attach-protocols').addEventListener('click', () => $('#protocol-files').click());
+    $('#record-attachment').addEventListener('change', async event => {
+      const file = event.target.files[0], targetId = attachmentTarget; event.target.value = '';
+      if (!file || !targetId || reviewing) return;
+      try {
+        if (file.size > 50e6 || !/\.pdf$/i.test(file.name)) throw new Error('Choose a PDF up to 50 MB.');
+        const bytes = await file.arrayBuffer();
+        if (new TextDecoder().decode(bytes.slice(0, 5)) !== '%PDF-') throw new Error('The selected file is not a PDF');
+        const digest = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), b => b.toString(16).padStart(2, '0')).join('');
+        const current = node(targetId);
+        if (current.source?.sha256 && current.source.sha256 !== digest) throw new Error('This record already identifies a different source. Add a new revision or separate source record.');
+        const fileId = `f-source-${digest}`;
+        await stageChange(`Attach source PDF to “${current.title}”`, () => {
+          const target = node(targetId);
+          target.source = { ...(target.source || { file: file.name, aliases: [file.name], sha256: digest, size: file.size }), attachedAt: now() };
+          target.fileId = fileId; target.mime = 'application/pdf';
+        }, { put: [[fileId, new Blob([file], { type: 'application/pdf' })]] });
+      } catch (error) { toast(error.message); }
+    });
+    $('#protocol-files').addEventListener('change', async event => {
+      const files = [...event.target.files]; event.target.value = '';
+      if (reviewing) return;
+      try {
+        const matches = new Map(), unmatched = [];
+        for (const file of files) {
+          if (file.size > 50e6) throw new Error('A selected PDF exceeds 50 MB');
+          const bytes = await file.arrayBuffer();
+          const digest = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), b => b.toString(16).padStart(2, '0')).join('');
+          if (state.nodes.some(n => n.source?.sha256 === digest)) matches.set(digest, file);
+          else unmatched.push(file.name);
+        }
+        if (!matches.size) throw new Error('No matching source PDFs. Add the MinION library first and choose its original PDFs.');
+        const put = [...matches].map(([digest, file]) => [`f-source-${digest}`, new Blob([file], { type: 'application/pdf' })]);
+        const reason = `Attach ${matches.size} verified source PDFs locally (matched by file digest). ${unmatched.length} unmatched files will not be attached.`;
+        await stageChange(reason, () => {
+          for (const n of state.nodes) if (matches.has(n.source?.sha256)) {
+            n.fileId = `f-source-${n.source.sha256}`; n.mime = 'application/pdf';
+            n.source.attachedAt = now();
+          }
+        }, { put });
+      } catch (error) { toast(error.message); }
+    });
+    document.addEventListener('submit', async event => {
+      const form = event.target.closest('[data-avatar-form]');
+      if (!form) return;
+      event.preventDefault();
+      const category = form.dataset.avatarForm, value = new FormData(form).get('avatar').trim();
+      await stageChange(`Set ${TYPES[category].label.toLowerCase()} category avatar`, () => {
+        state.avatars = [...(state.avatars || []).filter(a => a.id !== category), { id: category, kind: 'emoji', value }];
+      });
+    });
+    let avatarTarget;
+    $('#avatar-image-input').addEventListener('change', async event => {
+      const file = event.target.files[0], category = avatarTarget; event.target.value = '';
+      if (!file || !category || reviewing) return;
+      try {
+        if (!['image/png','image/jpeg','image/webp'].includes(file.type) || file.size > 256 * 1024) throw new Error('Choose a PNG, JPEG or WebP picture up to 256 KB.');
+        const value = await new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(r.result); r.onerror = reject; r.readAsDataURL(file); });
+        await stageChange(`Set ${TYPES[category].label.toLowerCase()} category picture`, () => {
+          state.avatars = [...(state.avatars || []).filter(a => a.id !== category), { id: category, kind: 'image', value }];
+        });
+      } catch (error) { toast(error.message); }
+    });
 
     document.addEventListener('click', async (ev) => {
       const t = ev.target.closest('button, [data-goto]');
       if (!t) return;
       const d = t.dataset;
+      if (d.avatarImage) { avatarTarget = d.avatarImage; $('#avatar-image-input').click(); return; }
+      if (d.avatarReset) {
+        await stageChange(`Restore default ${TYPES[d.avatarReset].label.toLowerCase()} avatar`, () => { state.avatars = (state.avatars || []).filter(a => a.id !== d.avatarReset); });
+        return;
+      }
       if (d.project) { state.current = d.project; state.selected = null; save(); if (view() === 'about') location.hash = 'graph'; render(); return; }
       if (d.unlink) {
         ev.stopPropagation();
@@ -637,16 +770,32 @@
 
   async function detailAction(act) {
     const n = node(state.selected); if (!n) return;
+    if (act === 'attach') { attachmentTarget = n.id; $('#record-attachment').click(); return; }
+    if (act === 'revision') {
+      const defaults = { ...n, protocolFamily: n.protocolFamily || n.id, revision: '', revisionDate: '' };
+      const f = await ask({ title: 'Add a new protocol revision', ok: 'Review new revision', body: `<p>The existing revision and its experiment links will stay unchanged. Attach the new source separately.</p><label>Title<input name="title" required maxlength="120" value="${esc(n.title)}"></label><label>Description<textarea name="text" rows="3" maxlength="2000"></textarea></label>${versionFields(defaults)}` });
+      if (!f) return;
+      const metadata = readVersionFields(f);
+      if (!metadata.revision || !metadata.protocolFamily) { toast('Record the family and new revision identifier first'); return; }
+      if (metadata.protocolFamily !== defaults.protocolFamily || metadata.platformKey !== (n.platformKey || '')) { toast('A revision must keep the same family and platform. Create a separate protocol for a different workflow.'); return; }
+      if (state.nodes.some(other => other.protocolFamily === metadata.protocolFamily && other.platformKey === metadata.platformKey && other.revision === metadata.revision && other.type === n.type)) { toast('That revision already exists in this stack'); return; }
+      await stageChange('Add protocol revision without changing earlier versions or experiment links', () => {
+        const resourceLinks = state.edges.filter(e => e.from === n.id && node(e.to)?.type === 'resource').map(e => ({ to: e.to, label: e.label }));
+        addNode({ type: n.type, title: f.get('title').trim(), text: f.get('text').trim(), ...metadata, supersedes: n.id }, [{ to: n.id, label: 'supersedes' }, ...resourceLinks]);
+      });
+      return;
+    }
     if (act === 'edit') {
       const f = await ask({ title: `Edit ${TYPES[n.type].label.toLowerCase()}`, body: `
         <label>Title<input name="title" required maxlength="120" value="${esc(n.title)}"></label>
         ${n.type === 'project' ? '' : `<label>Type<select name="type">${typeOptions(n.type)}</select></label>`}
-        <label>Description<textarea name="text" rows="3" maxlength="2000">${esc(n.text)}</textarea></label>` });
+        <label>Description<textarea name="text" rows="3" maxlength="2000">${esc(n.text)}</textarea></label>${!n.source && ['protocol','checklist'].includes(n.type) ? versionFields(n) : ''}` });
       if (!f) return;
       await stageChange('Edit research record', () => {
         const target = node(n.id);
         target.title = f.get('title').trim() || target.title; target.text = f.get('text').trim();
         if (f.get('type')) target.type = f.get('type');
+        if (!n.source && ['protocol','checklist'].includes(target.type)) Object.assign(target, readVersionFields(f));
         if (target.type === 'project') { const p = state.projects.find(x => x.id === target.project); if (p) p.name = target.title; }
       });
     }
@@ -696,12 +845,13 @@
       <label>Type<select name="type">${typeOptions('experiment')}</select></label>
       <label>Title<input name="title" required maxlength="120"></label>
       <label>Description<textarea name="text" rows="3" maxlength="2000"></textarea></label>
+      ${versionFields({})}
       ${opts ? `<label>Link to (optional)<select name="to"><option value="">— none —</option>${opts}</select></label>
       <label>Relationship<input name="label" maxlength="40" value="related to"></label>` : ''}` });
     if (!f || !f.get('title').trim()) return;
     const to = f.get('to');
     await stageChange('Add research record', () => {
-      addNode({ type: f.get('type'), title: f.get('title').trim(), text: f.get('text').trim() }, to ? [{ to, label: f.get('label').trim() || 'related to' }] : []);
+      addNode({ type: f.get('type'), title: f.get('title').trim(), text: f.get('text').trim(), ...(['protocol','checklist'].includes(f.get('type')) ? readVersionFields(f) : {}) }, to ? [{ to, label: f.get('label').trim() || 'related to' }] : []);
     });
     location.hash = 'graph'; render();
   }
@@ -743,6 +893,7 @@
       if ([...imported.nodes, ...imported.inbox].some(n => n.fileId && !fileIds.has(n.fileId))) throw new Error('Export is missing referenced files; import cancelled');
       await stageChange('Replace workspace from export, including stored files. Export current data first to retain it.', () => {
         for (const key of ['projects', 'nodes', 'edges', 'inbox', 'proposals']) state[key] = imported[key];
+        state.avatars = imported.avatars || [];
         state.current = imported.projects.some(p => p.id === imported.current) ? imported.current : imported.projects[0].id;
         state.selected = imported.nodes.some(n => n.id === imported.selected) ? imported.selected : null;
       }, { clear: true, put });

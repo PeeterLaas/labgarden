@@ -42,4 +42,6 @@ Research mutations must use `stageChange()` and `dist/change-service.js`; do not
 
 The optional local companion uses the same core through `server/workspace.cjs`. Its R tools expose read/draft operations only; do not expose approval or commit as model tools. `app.R` is a single-owner localhost approval console. The local file store is an initial adapter, not multi-user authentication or automatic browser sync. Keep `.r-library`, `.deps` and `local-data` ignored and out of commits.
 
+`dist/resource-library.js` merges the MinION metadata catalog without replacing existing projects and groups protocol/checklist artifacts by family, platform and revision. Never merge different platforms just because kit names match. New revisions are new records; retain the IDs used by past experiments. Do not commit source PDFs. Attachments stay in IndexedDB and are matched to catalog digests. Optional `state.avatars` is an array keyed by category ID and participates in the shared approval/audit service. Keep avatar image formats limited to embedded PNG/JPEG/WebP, with text labels still present.
+
 After any change, run both checks and try the flows in a browser (capture → review → accept, reload persists, export/import).
