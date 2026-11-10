@@ -307,8 +307,14 @@
   }
 
   // ---------- Routing ----------
-  const VIEWS = ['graph', 'inbox', 'review', 'library', 'avatars', 'about'];
-  const view = () => (VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'graph');
+  // ticker, planner and instruments exist only in lab mode (lab.js); elsewhere they fall back to the graph.
+  const LAB_VIEWS = ['ticker', 'planner', 'instruments'];
+  const VIEWS = ['graph', 'inbox', 'review', 'library', 'avatars', 'about', ...LAB_VIEWS];
+  const labOn = () => Boolean(window.PAIvikLab && window.PAIvikLab.on);
+  const view = () => {
+    const v = location.hash.slice(1);
+    return VIEWS.includes(v) && (labOn() || !LAB_VIEWS.includes(v)) ? v : 'graph';
+  };
 
   // ---------- Rendering ----------
   function render() {
@@ -320,9 +326,10 @@
     $('#view-about').hidden = v !== 'about';
     $$('[data-nav]').forEach((a) => a.classList.toggle('active', a.dataset.nav === v));
     $$('[data-tab]').forEach((a) => { a.classList.toggle('active', a.dataset.tab === v); a.setAttribute('aria-selected', a.dataset.tab === v); });
-    ['graph', 'inbox', 'review', 'library', 'avatars'].forEach((k) => { $(`#panel-${k}`).hidden = k !== v; });
-    $('#capture').hidden = v === 'library' || v === 'avatars';
-    $('#new-record').hidden = v === 'avatars';
+    ['graph', 'inbox', 'review', 'library', 'avatars', ...LAB_VIEWS].forEach((k) => { $(`#panel-${k}`).hidden = k !== v; });
+    $('#capture').hidden = v === 'library' || v === 'avatars' || LAB_VIEWS.includes(v);
+    $('#new-record').hidden = v === 'avatars' || LAB_VIEWS.includes(v);
+    if (labOn()) window.PAIvikLab.render(v);
 
     const inboxN = state.inbox.filter((c) => c.project === state.current && c.status === 'pending').length;
     const reviewN = pending().length;
@@ -921,8 +928,8 @@
       const safe = (Array.isArray(links) ? links : []).filter(l => l && typeof l.name === 'string' && l.name && /^https?:\/\//i.test(l.url || ''));
       if (!safe.length) return;
       const box = $('#service-links');
-      box.innerHTML = '<p class="navlabel">Lab services</p>' + safe.map(l =>
-        `<a href="${esc(l.url)}" target="_blank" rel="noopener"${l.note ? ` title="${esc(l.note)}"` : ''}><span class="ico" aria-hidden="true">↗</span> ${esc(l.name)}</a>`).join('');
+      box.innerHTML = '<details class="more"><summary class="navlabel">More lab services</summary>' + safe.map(l =>
+        `<a href="${esc(l.url)}" target="_blank" rel="noopener"${l.note ? ` title="${esc(l.note)}"` : ''}><span class="ico" aria-hidden="true">↗</span> ${esc(l.name)}</a>`).join('') + '</details>';
       box.hidden = false;
     } catch { /* Links are optional; the workspace works without them. */ }
   }
