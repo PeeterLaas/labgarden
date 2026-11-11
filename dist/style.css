@@ -346,3 +346,10 @@ body.sem-presenting{overflow:hidden}
 .labmap image.plan{opacity:.9}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .labmap image.plan{filter:invert(.88) hue-rotate(180deg);opacity:.75}}
 .mapcrumbs{font-weight:500}.mapcrumbs .link{font-weight:400}
+.labask{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px}
+.labask input{flex:1;min-width:0;font:inherit;padding:10px 14px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--text)}
+.labask input:focus{outline:2px solid var(--accent);outline-offset:1px}
+.labask .btn{border-radius:999px;padding:0 20px}
+.labask-out{flex-basis:100%;font-size:14px;padding:2px 14px}
+.askfound{border-left:4px solid var(--accent)}.askfound ul{margin:6px 0}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}

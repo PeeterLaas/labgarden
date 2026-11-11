@@ -18,7 +18,7 @@
     on: false, base: '', me: null, cat: null, error: '',
     choice: { title: '', protocol: '', mix: '', primer_f: '', primer_r: '', instrument: '', positive: '', samples: [], more: '', ntc: true, extra_pct: 13, modification: '', volumes: {}, volume_ul: '', template_ul: '' },
     preview: null, runId: null, run: null, people: null, tickWho: 'me', timers: [],
-    map: null, level: 0, placeKey: null, arranging: false, stashing: false, sem: null, slide: -1,
+    askFound: null, map: null, level: 0, placeKey: null, arranging: false, stashing: false, sem: null, slide: -1,
   };
 
   // ---------- talking to the gateway ----------
@@ -89,6 +89,12 @@
     }
     refreshBadges();
     setInterval(refreshBadges, 60000);
+    const asked = new URLSearchParams(location.search).get('ask');  // e.g. a link Claude made: ?ask=PCR+of+colonies+1-8#planner
+    if (asked && L.me) {
+      history.replaceState(null, '', location.pathname + location.hash);
+      $('#lab-ask-text').value = asked.slice(0, 4000);
+      askPaivik(asked.slice(0, 4000));
+    }
     window.dispatchEvent(new Event('hashchange'));  // app.js re-renders; lab views (#planner, ...) are allowed now
   }
 
@@ -237,7 +243,9 @@ ${t.mine ? `<details><summary class="labhint">＋ Attach next tick</summary><for
     const samples = cat.samples.map((r) => `<label class="pick"><input type="checkbox" data-lab-sample value="${r.id}"${c.samples.includes(String(r.id)) ? ' checked' : ''}>
 <span>${r.relevant ? '★ ' : ''}${esc(r.title)} <small>${esc(r.category)}</small>${r.where ? `<br><small>📍 ${esc(r.where)}</small>` : ''}</span></label>`).join('')
       || '<p class="labhint">No samples in the notebook yet. Type them below.</p>';
-    return `<div class="planner" data-lab-planner>
+    const understood = L.askFound ? `<div class="labcard askfound"><div class="labrow"><b>Filled in from your words</b><button type="button" class="link" data-ask-clear aria-label="Hide">✕</button></div>
+<ul class="tight">${L.askFound.map((f) => `<li>${esc(f)}</li>`).join('') || '<li>Nothing matched the notebook; pick below.</li>'}</ul><p class="labhint">Check and change anything below, then save.</p></div>` : '';
+    return `${understood}<div class="planner" data-lab-planner>
 <form class="labcard labform" data-lab-form="plan" autocomplete="off">
 <h2>PCR</h2>
 <label>Run name <input type="text" name="title" maxlength="200" value="${esc(c.title)}" placeholder="e.g. 16S colony PCR, plate 3"></label>
@@ -324,7 +332,7 @@ ${editable ? `<div class="labrow"><button type="button" class="btn" data-lab-sav
       const changed = JSON.stringify([draft.plan.mix, draft.plan.tubes]) !== shown;
       const saved = await api(`plans/${draft.id}/save`, { method: 'POST', body: { hash: draft.hash } });
       toast(changed ? 'Saved. The records had changed, so the numbers were updated: check the run page.' : 'Saved to the notebook');
-      L.choice.samples = []; L.choice.title = ''; L.choice.more = '';
+      L.choice.samples = []; L.choice.title = ''; L.choice.more = ''; L.askFound = null;
       openRun(saved.id);
     } catch (err) { toast(err.message); } finally { btn.disabled = false; btn.textContent = 'Save run to the notebook'; }
   }
@@ -643,6 +651,29 @@ ${t.notes.map((n) => `<div class="cm semnote"><b>${esc(n.name)}</b>: ${esc(n.tex
     }
   }
 
+  // ---------- Ask PAIvik: one sentence -> the Planner filled in, or a note written to the notebook ----------
+  async function askPaivik(text) {
+    const out = $('#lab-ask-out'); out.hidden = false; out.innerHTML = '<span class="labhint">Working on it…</span>';
+    try {
+      const r = await api('ask', { method: 'POST', body: { text } });
+      if (r.kind === 'plan') {
+        L.choice = { ...L.choice, ...r.choices, volumes: {}, volume_ul: '', template_ul: '' };
+        L.askFound = r.found; L.runId = null; out.hidden = true; out.innerHTML = '';
+        const panel = $('#panel-planner'); if (panel) panel.innerHTML = '';
+        if (location.hash !== '#planner') location.hash = 'planner'; else renderPlanner();
+        $('#lab-ask-text').value = '';
+      } else if (r.kind === 'change') {
+        out.innerHTML = r.status === 'committed'
+          ? `✓ Written to the notebook: ${esc(r.summary)} <a href="${esc(r.url)}" target="_blank" rel="noopener">details / fix ↗</a>`
+          : `Not written yet: ${esc(r.questions.join(' ') || r.summary)} <a href="${esc(r.url)}" target="_blank" rel="noopener">answer on the review page ↗</a>`;
+        $('#lab-ask-text').value = '';
+      } else if (r.kind === 'model_off') {
+        out.innerHTML = `The drafting model is off right now, so this was not sorted into an entry. <button type="button" class="link" data-ask-tick>Add it as a new tick instead</button>`;
+        out.dataset.text = r.text;
+      }
+    } catch (err) { if (err.code === 'NO_KEY' || err.code === 'SIGN_IN') { out.hidden = true; location.hash = 'ticker'; } else out.textContent = err.message; }
+  }
+
   // ---------- events (one delegated listener each, like app.js) ----------
   document.addEventListener('change', (ev) => {
     const t = ev.target;
@@ -663,6 +694,17 @@ ${t.notes.map((n) => `<div class="cm semnote"><b>${esc(n.name)}</b>: ${esc(n.tex
   document.addEventListener('input', (ev) => { if (ev.target.closest('[data-lab-form="plan"]') && ev.target.matches('input[type=text],input[type=number],textarea')) updatePreview(); });
 
   document.addEventListener('click', (ev) => {
+    const ak = ev.target.closest('[data-ask-clear],[data-ask-tick]');
+    if (ak) {
+      if (ak.matches('[data-ask-clear]')) { L.askFound = null; const b = $('.askfound'); if (b) b.remove(); }
+      else {
+        const out = $('#lab-ask-out');
+        api('ticker/attach', { method: 'POST', body: { title: out.dataset.text.slice(0, 200), note: out.dataset.text.length > 200 ? out.dataset.text : '' } })
+          .then(() => { out.innerHTML = '✓ Added as a tick. <a href="#ticker">Open the Ticker</a>'; $('#lab-ask-text').value = ''; if (currentView() === 'ticker') renderTicker(); })
+          .catch((err) => toast(err.message));
+      }
+      return;
+    }
     const sm = ev.target.closest('[data-sem-flag],[data-sem-present],[data-sem-slide],[data-sem-print],[data-sem-close],[data-sem-minutes]');
     if (sm) { semClick(sm).catch((err) => toast(err.message)); return; }
     const m = ev.target.closest('[data-map-arrange],[data-map-level],[data-map-nopic],[data-place],[data-place-close],[data-stash],[data-note-done],[data-takeout]');
@@ -682,6 +724,7 @@ ${t.notes.map((n) => `<div class="cm semnote"><b>${esc(n.name)}</b>: ${esc(n.tex
     ev.preventDefault();
     const kind = f.dataset.labForm, fd = new FormData(f), btn = f.querySelector('button');
     if (kind === 'plan') return;
+    if (kind === 'ask') { if (btn) btn.disabled = true; await askPaivik(String(fd.get('text') || '').trim()); if (btn) btn.disabled = false; return; }
     if (btn) btn.disabled = true;
     try {
       if (kind === 'key') {

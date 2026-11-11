@@ -66,6 +66,12 @@
         </div>
         <button type="button" class="pill" id="new-record">＋ New record</button>
       </div>
+      <form class="labask" id="lab-ask" data-lab-form="ask" data-lab hidden autocomplete="off">
+        <label for="lab-ask-text" class="sr-only">Ask PAIvik</label>
+        <input id="lab-ask-text" name="text" type="text" maxlength="4000" required placeholder="Ask PAIvik: “PCR of colonies 1–8 with 27F/1492R” or “Filtration in experiment 15 took 40 min”">
+        <button class="btn">Ask</button>
+        <div id="lab-ask-out" class="labask-out" role="status" hidden></div>
+      </form>
       <div class="tabs" role="tablist">
         <a role="tab" href="#graph" data-tab="graph">Graph</a>
         <a role="tab" href="#ticker" data-tab="ticker" data-lab hidden>Ticker</a>
@@ -144,7 +150,7 @@
         <li><b>Everything stays in your browser.</b> Records, files and voice notes are stored with IndexedDB on this device. Use Export to keep a copy or move it to another browser.</li>
         <li><b>The gardener is rule-based.</b> It matches IDs, names and file types. It runs no AI model, local or cloud.</li>
         <li><b>Fast, and fixable afterwards.</b> Captures wait in the inbox and suggestions wait in Review, but your own click is the decision: no second confirmation. Undo is offered right after, and every change keeps its exact before/after under Review → Decided changes.</li>
-        <li><b>Optional lab mode.</b> When a lab hosts this page next to its PAIvik gateway, a Ticker, a PCR Planner, a Seminar that puts itself together from the Ticker, and a Lab map of fridges, freezers and instruments appear. Their data lives on the lab's server and notebook, not in this browser; changes are written in your name with your own notebook key, and model-drafted changes are still approved on the lab's review page. On this public page lab mode is off.</li>
+        <li><b>Optional lab mode.</b> When a lab hosts this page next to its PAIvik gateway, a Ticker, a PCR Planner, a Seminar that puts itself together from the Ticker, a Lab map of fridges, freezers and instruments, and an “Ask PAIvik” box (a run to plan opens the Planner filled in from the notebook’s record names; anything else is drafted by the lab’s own model into a note) appear. Their data lives on the lab's server and notebook, not in this browser; changes are written in your name with your own notebook key, and model-drafted changes are still approved on the lab's review page. On this public page lab mode is off.</li>
       </ul>
 
       <h2>Where it is going</h2>
