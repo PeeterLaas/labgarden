@@ -292,7 +292,7 @@ ol.tight{margin:0;padding-left:22px;font-size:14px}
 .labmap-wrap{position:relative}
 .labmap-scroll{overflow-x:auto;border-radius:var(--radius)}
 .labmap{display:block;width:100%;min-width:640px;height:auto;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--radius)}
-.labmap .room{fill:none;stroke:var(--line);stroke-width:3;stroke-dasharray:2 0}
+.labmap .room-outline{fill:none;stroke:var(--line);stroke-width:3}
 .labmap .place{cursor:pointer;outline:none}
 .labmap .place rect{fill:var(--surface);stroke:var(--rec-stroke);stroke-width:1.5;transition:stroke-width .15s}
 .labmap .place:hover rect,.labmap .place:focus-visible rect{stroke-width:3}
@@ -338,3 +338,11 @@ body.sem-presenting{overflow:hidden}
   body.sem-print .labcard{box-shadow:none;break-inside:avoid}
 }
 .sempresent .btn:disabled{opacity:.35;cursor:default}
+.labmap .place.room rect{fill:var(--accent);fill-opacity:.10;stroke:var(--accent);stroke-width:2}
+.labmap .place.room:hover rect,.labmap .place.room:focus-visible rect{fill-opacity:.2}
+.labmap.haspic .place.room rect{fill-opacity:.18}
+.labmap.haspic .place.room text.nm{font-weight:500;paint-order:stroke;stroke:var(--surface);stroke-width:4px}
+.labmap .grip{fill:var(--accent);stroke:none;cursor:nwse-resize}
+.labmap image.plan{opacity:.9}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .labmap image.plan{filter:invert(.88) hue-rotate(180deg);opacity:.75}}
+.mapcrumbs{font-weight:500}.mapcrumbs .link{font-weight:400}

@@ -18,7 +18,7 @@
     on: false, base: '', me: null, cat: null, error: '',
     choice: { title: '', protocol: '', mix: '', primer_f: '', primer_r: '', instrument: '', positive: '', samples: [], more: '', ntc: true, extra_pct: 13, modification: '', volumes: {}, volume_ul: '', template_ul: '' },
     preview: null, runId: null, run: null, people: null, tickWho: 'me', timers: [],
-    map: null, placeKey: null, arranging: false, stashing: false, sem: null, slide: -1,
+    map: null, level: 0, placeKey: null, arranging: false, stashing: false, sem: null, slide: -1,
   };
 
   // ---------- talking to the gateway ----------
@@ -115,7 +115,7 @@
     if (!L.me.has_key) return;
     try {
       const m = await api('map');  // one call: instruments in use and open notes on the lab map
-      const busy = m.places.filter((x) => x.state && x.state !== 'free').length;
+      const busy = m.busy || 0;  // all instruments, in every room
       $('#count-map').textContent = [busy ? `${busy} busy` : '', m.open_notes ? `💬${m.open_notes}` : ''].filter(Boolean).join(' ');
       const plans = await api('plans');
       L.timers = plans.mine.filter((p) => p.booking_end && new Date(p.booking_end) > new Date()).map((p) => ({ id: p.id, title: p.plan.title, end: p.booking_end }));
@@ -390,7 +390,7 @@ ${p.mine ? '<div class="labrow"><input type="text" name="note" maxlength="500" p
   }
 
   // ---------- Lab map: fridges, freezers, instruments; notes; today's products ----------
-  const ICON = { freezer80: '❄❄', freezer: '❄', fridge: '▯', cabinet: '▦', shelf: '▤', bench: '▭', instrument: '⚙', storage: '▢' };
+  const ICON = { freezer80: '❄❄', freezer: '❄', fridge: '▯', cabinet: '▦', shelf: '▤', bench: '▭', instrument: '⚙', storage: '▢', room: '⌂' };
   // Names wrap onto two lines inside the box; longer ones end in an ellipsis (the full name is in the side panel).
   function lines(t, w) {
     const max = Math.max(5, Math.floor(w / 8.6)), words = String(t).split(/\s+/), out = [''];
@@ -407,31 +407,44 @@ ${p.mine ? '<div class="labrow"><input type="text" name="note" maxlength="500" p
     const panel = $('#panel-map');
     if (!panel.innerHTML) panel.innerHTML = '<p class="labhint">Loading the lab map…</p>';
     try {
-      L.map = await api('map');
+      L.map = await api('map?level=' + L.level);
       drawMap(panel);
-      if (L.placeKey) openPlace(L.placeKey);
+      if (L.placeKey && L.map.places.some((x) => x.key === L.placeKey)) openPlace(L.placeKey);
+      else if (L.level) openPlace('s:' + L.level);  // inside a room: its own notes and contents
+      else L.placeKey = null;
     } catch (err) { problem(panel, err); }
   }
 
   function drawMap(panel) {
-    const m = L.map;
+    const m = L.map, room = m.trail.length ? m.trail[m.trail.length - 1] : null;
     const kinds = Object.entries(m.kinds).filter(([k]) => k !== 'instrument').map(([k, v]) => `<option value="${esc(k)}">${esc(v)}</option>`).join('');
+    const pic = m.picture ? `<image class="plan" href="${esc(L.base)}api/v1/map/picture?level=${m.level}&v=${encodeURIComponent(m.picture.at)}" x="0" y="0" width="${m.w}" height="${m.h}" preserveAspectRatio="none"/>` : '';
     const box = (p) => {
       const st = p.state ? ` ${p.state.replace(' ', '-')}` : '';
       const badges = [p.count ? `${p.count}` : '', p.notes ? `💬${p.notes}` : ''].filter(Boolean).join(' ');
+      const isRoom = p.kind === 'room';
+      const label = lines(p.name, p.w - 16);
       return `<g class="place ${esc(p.kind)}${st}${p.key === L.placeKey ? ' sel' : ''}" data-place="${esc(p.key)}" transform="translate(${p.x} ${p.y})" tabindex="0" role="button"
- aria-label="${esc(p.name)}${p.count ? `, ${p.count} stored` : ''}${p.notes ? `, ${p.notes} notes` : ''}${p.state ? `, ${esc(p.state)}` : ''}">
-<rect width="${p.w}" height="${p.h}" rx="10"/><text x="10" y="28" class="ico">${ICON[p.kind] || '▢'}</text>
-${lines(p.name, p.w - 16).map((l, i, a) => `<text x="10" y="${p.h - 12 - (a.length - 1 - i) * 18}" class="nm">${esc(l)}</text>`).join('')}${badges ? `<text x="${p.w - 10}" y="26" class="bd" text-anchor="end">${esc(badges)}</text>` : ''}</g>`;
+ aria-label="${esc(p.name)}${isRoom ? ' (room, opens its plan)' : ''}${p.count ? `, ${p.count} stored` : ''}${p.notes ? `, ${p.notes} notes` : ''}${p.state ? `, ${esc(p.state)}` : ''}">
+<rect width="${p.w}" height="${p.h}" rx="${isRoom ? 4 : 10}"/>${isRoom
+  ? label.map((l, i) => `<text x="8" y="${20 + i * 17}" class="nm">${esc(l)}</text>`).join('')
+  : `<text x="10" y="28" class="ico">${ICON[p.kind] || '▢'}</text>${label.map((l, i, a) => `<text x="10" y="${p.h - 12 - (a.length - 1 - i) * 18}" class="nm">${esc(l)}</text>`).join('')}`}
+${badges ? `<text x="${p.w - 8}" y="${isRoom ? p.h - 10 : 26}" class="bd" text-anchor="end">${esc(badges)}</text>` : ''}
+${L.arranging ? `<rect class="grip" data-grip width="16" height="16" x="${p.w - 16}" y="${p.h - 16}" rx="3"/>` : ''}</g>`;
     };
-    panel.innerHTML = `<div class="labrow"><b>Lab map</b>
-<span class="labhint">${m.places.length ? 'Tap a fridge, freezer or instrument to see what is in it, leave a note, or put today’s products there.' : 'No storage yet: add your first fridge or freezer.'}</span>
-<button type="button" class="link" data-map-arrange>${L.arranging ? '✓ Done arranging' : '✥ Arrange the room'}</button>
+    const crumbs = [`<button type="button" class="link" data-map-level="0"${m.level ? '' : ' aria-current="page"'}>Floor</button>`,
+      ...m.trail.map((t, i) => (i === m.trail.length - 1 ? `<b>${esc(t.name)}</b>` : `<button type="button" class="link" data-map-level="${t.id}">${esc(t.name)}</button>`))].join(' › ');
+    panel.innerHTML = `<div class="labrow"><b class="mapcrumbs">${crumbs}</b>
+<span class="labhint">${m.places.length ? (m.level ? 'Tap a fridge, freezer or instrument: see what is in it, leave a note, or put today’s products there.' : 'Tap a room to go in, or a fridge or instrument to see it.') : (m.level ? 'Nothing placed in this room yet.' : 'No storage yet: add a room or your first fridge.')}</span>
+<button type="button" class="link" data-map-arrange>${L.arranging ? '✓ Done arranging' : '✥ Arrange'}</button>
 <a class="link" href="#instruments">Instrument list</a></div>
-${L.arranging || !m.places.length ? `<form data-lab-form="unit" class="labrow labcard"><input name="name" required maxlength="100" placeholder="New: e.g. Freezer −20 °C by the door" aria-label="Name of the new fridge or freezer">
-<select name="kind" aria-label="Kind">${kinds}</select><button class="btn">Add</button><span class="labhint">${L.arranging ? 'Drag boxes to where they stand; changes save when you press Done.' : ''}</span></form>` : ''}
-<div class="labmap-wrap"><div class="labmap-scroll"><svg class="labmap${L.arranging ? ' arranging' : ''}" viewBox="0 0 ${m.w} ${m.h}" role="group" aria-label="Floorplan">
-<rect class="room" x="4" y="4" width="${m.w - 8}" height="${m.h - 8}" rx="14"/>${m.places.map(box).join('')}</svg></div>
+${L.arranging || !m.places.length ? `<div class="labcard"><form data-lab-form="unit" class="labrow"><input name="name" required maxlength="100" placeholder="${m.level ? 'New here: e.g. Freezer −20 °C by the door' : 'New: e.g. 613 BSL-2 lab, or Freezer −80 °C'}" aria-label="Name of the new room, fridge or freezer">
+<select name="kind" aria-label="Kind">${kinds.replace(`value="${m.level ? 'freezer' : 'room'}"`, `value="${m.level ? 'freezer' : 'room'}" selected`)}</select><button class="btn">Add</button></form>
+<form data-lab-form="mappic" class="labrow"><label class="labhint">Floor plan picture${room ? ` for ${esc(room.name)}` : ''} (PDF, PNG or JPEG) <input type="file" name="picture" accept="application/pdf,image/png,image/jpeg,image/webp" required></label><button class="btn">Upload</button>
+${m.picture ? '<button type="button" class="link" data-map-nopic>Remove picture</button>' : ''}</form>
+${L.arranging ? '<p class="labhint">Drag boxes to where they are; drag the corner square to resize (rooms: trace them over the plan). Saved when you press Done.</p>' : ''}</div>` : ''}
+<div class="labmap-wrap"><div class="labmap-scroll"><svg class="labmap${L.arranging ? ' arranging' : ''}${m.picture ? ' haspic' : ''}" viewBox="0 0 ${m.w} ${m.h}" role="group" aria-label="${room ? esc(room.name) : 'Floor plan'}">
+${pic || `<rect class="room-outline" x="4" y="4" width="${m.w - 8}" height="${m.h - 8}" rx="14"/>`}${m.places.map(box).join('')}</svg></div>
 <aside id="lab-place" class="labcard labplace"${L.placeKey ? '' : ' hidden'}></aside></div>`;
   }
 
@@ -456,13 +469,16 @@ ${done.length ? `<details><summary class="labhint">${done.length} done</summary>
   }
 
   function drawPlace(side, pl) {
-    const head = `<div class="labrow"><b>${ICON[pl.type === 'instrument' ? 'instrument' : (L.map.places.find((p) => p.key === pl.key) || {}).kind] || '▢'} ${esc(pl.name)}</b>
+    const kind = pl.type === 'instrument' ? 'instrument' : pl.key === 's:' + L.level ? 'room' : (L.map.places.find((p) => p.key === pl.key) || {}).kind;
+    const head = `<div class="labrow"><b>${ICON[kind] || '▢'} ${esc(pl.name)}</b>
 <button type="button" class="link" data-place-close aria-label="Close">✕</button></div>`;
     if (pl.type === 'instrument') {
       side.innerHTML = `${head}<p><span class="chip inst-${esc(pl.state.replace(' ', '-'))}">${esc(pl.state)}</span>${pl.responsible ? ` <span class="labhint">Responsible: ${esc(pl.responsible)}</span>` : ''}</p>
 ${pl.now.map((x) => `<p>${esc(x.who)}: ${esc(x.title)} · until ${esc(x.until)}</p>`).join('')}
 ${pl.later.length ? `<p class="labhint">Later today: ${pl.later.map((x) => `${esc(x.from)}–${esc(x.until)} ${esc(x.who)}`).join(', ')}</p>` : ''}
-<p class="labrow"><a class="btn" href="#planner">Plan a run</a><a class="link" href="${esc(notebookLink('items', pl.id))}" target="_blank" rel="noopener">Book in the notebook ↗</a></p>${notesHtml(pl)}`;
+<p class="labrow"><a class="btn" href="#planner">Plan a run</a><a class="link" href="${esc(notebookLink('items', pl.id))}" target="_blank" rel="noopener">Book in the notebook ↗</a></p>
+${L.map.rooms.length ? `<p class="labrow"><label class="labhint">Stands in <select data-inst-room="${esc(pl.key)}">${[['0', 'the floor plan'], ...L.map.rooms.map((r) => [String(r.id), r.name])].map(([v, t]) => `<option value="${esc(v)}"${Number(v) === L.map.level ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label></p>` : ''}
+${notesHtml(pl)}`;
       return;
     }
     const rows = pl.sections.map((s) => `<div class="psec" style="--d:${s.depth}"><p class="labhint">${s.depth ? '└ ' : ''}${esc(s.name)}</p>
@@ -498,17 +514,25 @@ ${runs.map((r) => `<label class="pick"><input type="checkbox" name="pick" value=
     const g = ev.target.closest('.labmap.arranging .place'); if (!g) return;
     const svg = g.ownerSVGElement, pt = svg.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY;
     const at = pt.matrixTransform(svg.getScreenCTM().inverse()), p = L.map.places.find((x) => x.key === g.dataset.place);
-    drag = { g, p, dx: at.x - p.x, dy: at.y - p.y, svg }; g.setPointerCapture(ev.pointerId); ev.preventDefault();
+    drag = { g, p, dx: at.x - p.x, dy: at.y - p.y, svg, resize: !!ev.target.closest('[data-grip]') }; g.setPointerCapture(ev.pointerId); ev.preventDefault();
   });
   document.addEventListener('pointermove', (ev) => {
     if (!drag) return;
     const pt = drag.svg.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY;
     const at = pt.matrixTransform(drag.svg.getScreenCTM().inverse());
-    drag.p.x = Math.round(Math.min(Math.max(at.x - drag.dx, 0), L.map.w - drag.p.w) / 5) * 5;
-    drag.p.y = Math.round(Math.min(Math.max(at.y - drag.dy, 0), L.map.h - drag.p.h) / 5) * 5;
-    drag.g.setAttribute('transform', `translate(${drag.p.x} ${drag.p.y})`); drag.p.moved = true;
+    const p = drag.p; p.moved = true;
+    if (drag.resize) {  // corner square: resize, then redraw so the label and grip follow
+      p.w = Math.round(Math.min(Math.max(at.x - p.x, 30), L.map.w - p.x) / 5) * 5;
+      p.h = Math.round(Math.min(Math.max(at.y - p.y, 24), L.map.h - p.y) / 5) * 5;
+      const r = drag.g.querySelector('rect'), grip = drag.g.querySelector('[data-grip]');
+      r.setAttribute('width', p.w); r.setAttribute('height', p.h); grip.setAttribute('x', p.w - 16); grip.setAttribute('y', p.h - 16);
+      return;
+    }
+    p.x = Math.round(Math.min(Math.max(at.x - drag.dx, 0), L.map.w - p.w) / 5) * 5;
+    p.y = Math.round(Math.min(Math.max(at.y - drag.dy, 0), L.map.h - p.h) / 5) * 5;
+    drag.g.setAttribute('transform', `translate(${p.x} ${p.y})`);
   });
-  document.addEventListener('pointerup', () => { drag = null; });
+  document.addEventListener('pointerup', () => { if (drag && drag.resize) drawMap($('#panel-map')); drag = null; });
   document.addEventListener('keydown', (ev) => {
     const g = ev.target.closest && ev.target.closest('.labmap .place');
     if (g && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); openPlace(g.dataset.place); }
@@ -517,11 +541,19 @@ ${runs.map((r) => `<label class="pick"><input type="checkbox" name="pick" value=
   async function mapClick(t) {
     if (t.matches('[data-map-arrange]')) {
       if (L.arranging) {
-        const moved = L.map.places.filter((p) => p.moved).map(({ key, kind, x, y, w, h }) => ({ key, kind, x, y, w, h }));
+        const moved = L.map.places.filter((p) => p.moved).map(({ key, kind, x, y, w, h }) => ({ key, kind, x, y, w, h, level: L.level }));
         if (moved.length) { await api('map/layout', { method: 'POST', body: { places: moved } }); toast('Room layout saved'); }
       }
       L.arranging = !L.arranging; drawMap($('#panel-map')); if (L.placeKey && !L.arranging) openPlace(L.placeKey);
-    } else if (t.matches('[data-place]')) { if (!L.arranging) openPlace(t.dataset.place); }
+    } else if (t.matches('[data-map-level]')) { L.level = Number(t.dataset.mapLevel); L.placeKey = null; renderMap(); }
+    else if (t.matches('[data-map-nopic]')) {
+      const fd = new FormData(); fd.append('remove', '1');
+      await api('map/picture?level=' + L.level, { method: 'POST', form: fd }); toast('Picture removed'); renderMap();
+    } else if (t.matches('[data-place]')) {
+      if (L.arranging) return;
+      const p = L.map.places.find((x) => x.key === t.dataset.place);
+      if (p && p.kind === 'room') { L.level = Number(p.key.slice(2)); L.placeKey = null; renderMap(); } else openPlace(t.dataset.place);
+    }
     else if (t.matches('[data-place-close]')) { L.placeKey = null; $('#lab-place').hidden = true; $$('.labmap .place.sel').forEach((g) => g.classList.remove('sel')); }
     else if (t.matches('[data-stash]')) openStash(t.dataset.stash);
     else if (t.matches('[data-note-done]')) { await api(`map/notes/${t.dataset.noteDone}/done`, { method: 'POST', body: {} }); renderMap(); refreshBadges(); }
@@ -622,13 +654,18 @@ ${t.notes.map((n) => `<div class="cm semnote"><b>${esc(n.name)}</b>: ${esc(n.tex
     else if (t.matches('[data-lab-vol]')) { L.choice.volumes[t.dataset.labVol] = t.value; updatePreview(); }
     else if (t.matches('[data-lab-total]')) { L.choice[t.dataset.labTotal] = t.value; updatePreview(); }
     else if (t.matches('[data-lab-tickwho]')) { L.tickWho = t.value; renderTicker(); }
+    else if (t.matches('[data-inst-room]')) {
+      const p = L.map.places.find((x) => x.key === t.dataset.instRoom) || { w: 130, h: 84 };
+      api('map/layout', { method: 'POST', body: { places: [{ key: t.dataset.instRoom, kind: 'instrument', x: 435, y: 250, w: p.w, h: p.h, level: Number(t.value) }] } })
+        .then(() => { toast('Moved'); L.placeKey = null; renderMap(); }).catch((err) => toast(err.message));
+    }
   });
   document.addEventListener('input', (ev) => { if (ev.target.closest('[data-lab-form="plan"]') && ev.target.matches('input[type=text],input[type=number],textarea')) updatePreview(); });
 
   document.addEventListener('click', (ev) => {
     const sm = ev.target.closest('[data-sem-flag],[data-sem-present],[data-sem-slide],[data-sem-print],[data-sem-close],[data-sem-minutes]');
     if (sm) { semClick(sm).catch((err) => toast(err.message)); return; }
-    const m = ev.target.closest('[data-map-arrange],[data-place],[data-place-close],[data-stash],[data-note-done],[data-takeout]');
+    const m = ev.target.closest('[data-map-arrange],[data-map-level],[data-map-nopic],[data-place],[data-place-close],[data-stash],[data-note-done],[data-takeout]');
     if (m) { mapClick(m).catch((err) => toast(err.message)); return; }
     const t = ev.target.closest('[data-lab-save],[data-lab-run],[data-lab-back],[data-lab-retry],#lab-timer');
     if (!t) return;
@@ -667,8 +704,12 @@ ${t.notes.map((n) => `<div class="cm semnote"><b>${esc(n.name)}</b>: ${esc(n.tex
         L.run = await api(`plans/${L.runId}/results`, { method: 'POST', body: { calls, note: fd.get('note') || '' } });
         toast('Result written to the notebook'); renderPlanner();
       } else if (kind === 'unit') {
-        await api('map/units', { method: 'POST', body: { name: fd.get('name'), kind: fd.get('kind') } });
+        await api('map/units', { method: 'POST', body: { name: fd.get('name'), kind: fd.get('kind'), level: L.level } });
         toast('Added. Drag it to where it stands.'); L.arranging = true; renderMap();
+      } else if (kind === 'mappic') {
+        const up = new FormData(); up.append('picture', fd.get('picture'));
+        await api('map/picture?level=' + L.level, { method: 'POST', form: up });
+        toast('Floor plan added. Arrange: trace the rooms over it.'); L.arranging = true; renderMap();
       } else if (kind === 'shelf') {
         await api('map/units', { method: 'POST', body: { name: fd.get('name'), parent: fd.get('parent') } });
         toast('Shelf added'); renderMap();
