@@ -18,12 +18,12 @@ Open http://localhost:8000.
 - Capture text notes, files (images, audio, CSV and others, up to 50 MB each) and voice notes recorded in the browser.
 - A rule-based gardener suggests a record type and links (matching names and IDs such as `014`) and flags missing collection times and possible duplicates.
 - Review: accept, edit then accept, or dismiss each suggestion; nothing joins the graph without it. Decided changes are kept as history.
-- Research changes now show an exact before/after preview and require typing `CONFIRM`. Edits, relationships, deletions, project creation, imports and resets use the same approval service. Capturing evidence and moving graph nodes remain separate from committing research changes.
+- Research changes save on the click that asks for them, with no second confirmation. The toast offers **Undo**, and every change, with its exact before/after, stays under **Review → Decided changes**, so mistakes are fixed afterwards. Undo is not offered when a change adds or removes stored files (for example deleting a capture whose file nothing else uses): the history keeps the record's metadata, not the file, so export first if you may need it. Only replacing the whole workspace (reset, import) asks once. Edits, relationships, deletions, project creation, imports and resets use the same approval service. Capturing evidence and moving graph nodes remain separate from committing research changes.
 - Previews for images, audio and CSV files; download the original file.
 - Several projects, data saved in IndexedDB across reloads, JSON export and import (including files), and reset to the sample.
 - Light and dark mode, keyboard access, and a phone layout.
 - Resources and protocol version stacks, with the newest dated revision in your library first. Older records and experiment links stay intact when adding a revision.
-- A MinION Sequencer starter library with separate MinION/Flongle records, full protocols, checklists and reference notes. Add it from **Resources & protocols → Add MinION library**, review, then type `CONFIRM`.
+- A MinION Sequencer starter library with separate MinION/Flongle records, full protocols, checklists and reference notes. Add it from **Resources & protocols → Add MinION library**; it is added at once and can be undone from the toast.
 - Category-wide avatars: choose an emoji, initials, or a local PNG/JPEG/WebP picture up to 256 KB from **Category avatars**. Labels remain visible and avatars travel with workspace exports.
 
 ## Current scope

@@ -4,7 +4,7 @@ The browser app and the optional R companion share `dist/change-service.js`. Bot
 
 ## Browser workflow
 
-Accepting or editing a suggestion opens a second, exact preview. Type `CONFIRM` and select **Confirm and commit**. Cancel leaves the research records unchanged. Record creation, editing, linking, unlinking, deletion, project creation, capture deletion, flag decisions, import and reset use the same boundary. Capturing evidence, selecting draft links and rearranging the graph do not themselves commit scientific changes.
+Accepting or editing a suggestion commits it straight away: the click is the decision. The toast offers **Undo**, and the exact before/after is kept under **Review → Decided changes**. Only reset and import, which replace the whole workspace, ask once. Record creation, editing, linking, unlinking, deletion, project creation, capture deletion, flag decisions, import and reset use the same boundary. Capturing evidence, selecting draft links and rearranging the graph do not themselves commit scientific changes.
 
 The proposal includes a SHA-256 content digest and the expected workspace snapshot. A changed preview, mismatched user/revision, stale workspace or repeated commit is rejected. Approval commits persist browser state and associated file changes together in one IndexedDB transaction. Capture intake writes files before the debounced state save; an interruption between them can leave a capture absent after reload. Another tab cannot silently overwrite newer research content. The Review history shows approved operations and the original values.
 
@@ -70,7 +70,7 @@ The browser and companion are separate stores using the same data schema and app
 2. In the local Shiny console, upload the export and select **Prepare import for review**.
 3. Load and confirm that import proposal. Existing local records are replaced only after approval; local audit history is retained.
 4. Search and draft through MCP, then review changes in Shiny.
-5. Export the local workspace and import it into the browser, reviewing the replacement preview there.
+5. Export the local workspace and import it into the browser; the browser asks once before replacing its workspace.
 
 The companion rejects file-bearing imports instead of losing or uploading attachments. Keep recordings, photos and file-bearing workspaces in the browser for now. Imported history is not treated as locally verified approval history.
 

@@ -242,7 +242,16 @@
     const el = document.createElement('div');
     el.className = 'toast'; el.setAttribute('role', 'status'); document.body.append(el);
     let t;
-    return (msg) => { el.textContent = msg; el.classList.add('show'); clearTimeout(t); t = setTimeout(() => el.classList.remove('show'), 2600); };
+    // An optional action (e.g. Undo) keeps the toast up longer and makes it clickable.
+    return (msg, action) => {
+      el.textContent = msg; el.classList.toggle('act', !!action);
+      if (action) {
+        const b = document.createElement('button'); b.type = 'button'; b.textContent = action.label;
+        b.addEventListener('click', () => { el.classList.remove('show'); action.run(); }, { once: true });
+        el.append(' ', b);
+      }
+      el.classList.add('show'); clearTimeout(t); t = setTimeout(() => el.classList.remove('show'), action ? 8000 : 2600);
+    };
   })();
 
   // ---------- Dialog helper ----------
@@ -264,9 +273,12 @@
   const nodeOptions = (exclude) => nodesHere().filter((n) => n.id !== exclude)
     .map((n) => `<option value="${n.id}">${esc(n.title)} · ${TYPES[n.type].label}</option>`).join('');
 
-  // All scientific mutations share this preview/confirmation/commit boundary.
-  // Capture intake and layout moves are saved independently, without changing the research graph.
-  async function stageChange(reason, mutate, fileActions = {}) {
+  // All scientific mutations go through the same commit boundary and audit history (Review → Decided changes).
+  // Work is streamlined: the click that asks for a change is the decision, so there is no second confirmation.
+  // Mistakes are fixed afterwards: Undo on the toast, or a later edit; every change stays in the history.
+  // Only replacing the whole workspace (reset, import) still asks once, because stored files cannot come back.
+  let lastChange = null;
+  async function stageChange(reason, mutate, fileActions = {}, { wipe = false, undo = true } = {}) {
     if (reviewing) { toast('Finish the current review first'); return false; }
     reviewing = true;
     const original = state;
@@ -276,18 +288,9 @@
       state = desired;
       try { mutate(); } finally { state = original; }
       const proposal = await changes.prepare(state, desired, { reason });
-      const showValue = value => {
-        const image = value?.kind === 'image' ? `<img class="avatar-review" src="${esc(value.value)}" alt="Category avatar preview">` : '';
-        return `${image}<pre>${esc(JSON.stringify(value, (key, v) => key === 'value' && typeof v === 'string' && v.startsWith('data:image/') ? '[Embedded image shown above]' : v, 2))}</pre>`;
-      };
-      const summary = proposal.operations.map(op => `<li><strong>${esc(op.collection)}: ${esc(op.id)}</strong>` +
-        `<div>Before</div>${showValue(op.before)}<div>After</div>${showValue(op.after)}</li>`).join('');
-      const approval = await ask({ title: 'Confirm research changes', ok: 'Confirm and commit', body:
-        `<p>${esc(reason)}</p><p>Review the exact additions, edits and removals below. Cancel leaves research records unchanged.</p>` +
-        `<details open><summary>${proposal.operations.length} changes · revision ${proposal.revision}</summary><ol class="change-preview">${summary}</ol></details>` +
-        '<label>Type CONFIRM to approve this preview<input name="confirmation" required pattern="CONFIRM" autocomplete="off"></label>' });
-      if (!approval || approval.get('confirmation') !== 'CONFIRM') return false;
-      const next = await changes.commit(state, proposal, changes.confirmation(proposal, 'local-user', 'typed'));
+      if (wipe && !await ask({ title: 'Replace the whole workspace?', ok: 'Replace', danger: true,
+        body: `<p>${esc(reason)}</p>` })) return false;
+      const next = await changes.commit(state, proposal, changes.confirmation(proposal, 'local-user', 'button'));
       next.current = desired.current; next.selected = desired.selected;
       // Preserve the placement chosen for new nodes; coordinates are not research content.
       next.nodes.forEach(n => { if (!state.nodes.some(old => old.id === n.id)) {
@@ -297,7 +300,10 @@
       await persist(next, fileActions);
       state = next;
       if (fileActions.clear || fileActions.remove?.length) { urls.forEach(u => URL.revokeObjectURL(u)); urls.clear(); }
-      render(); toast('Approved changes committed and saved');
+      const undoable = undo && !wipe && !fileActions.clear && !fileActions.remove?.length && !fileActions.put?.length;
+      lastChange = undoable ? { reason, before: original, after: await changes.hash(changes.snapshot(next)) } : null;
+      render();
+      toast(`Saved: ${reason.replace(/\.$/, '')}`, undoable ? { label: 'Undo', run: undoLast } : null);
       return true;
     } catch (error) {
       state = original; toast(error.message);
@@ -306,9 +312,23 @@
     } finally { reviewing = false; }
   }
 
+  async function undoLast() {
+    const last = lastChange; lastChange = null;
+    if (!last) return;
+    if (await changes.hash(changes.snapshot(state)) !== last.after) { toast('Something changed since; edit the record instead'); return; }
+    const keep = ['projects', 'nodes', 'edges', 'inbox', 'proposals', 'avatars'];
+    await stageChange(`Undo: ${last.reason}`, () => { keep.forEach(k => { state[k] = structuredClone(last.before[k] || []); }); }, {}, { undo: false });
+  }
+
   // ---------- Routing ----------
-  const VIEWS = ['graph', 'inbox', 'review', 'library', 'avatars', 'about'];
-  const view = () => (VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'graph');
+  // ticker, planner and instruments exist only in lab mode (lab.js); elsewhere they fall back to the graph.
+  const LAB_VIEWS = ['labgraph', 'ticker', 'planner', 'seminar', 'manuscripts', 'map', 'instruments'];
+  const VIEWS = ['graph', 'inbox', 'review', 'library', 'avatars', 'about', ...LAB_VIEWS];
+  const labOn = () => Boolean(window.PAIvikLab && window.PAIvikLab.on);
+  const view = () => {
+    const v = location.hash.slice(1);
+    return VIEWS.includes(v) && (labOn() || !LAB_VIEWS.includes(v)) ? v : 'graph';
+  };
 
   // ---------- Rendering ----------
   function render() {
@@ -320,9 +340,10 @@
     $('#view-about').hidden = v !== 'about';
     $$('[data-nav]').forEach((a) => a.classList.toggle('active', a.dataset.nav === v));
     $$('[data-tab]').forEach((a) => { a.classList.toggle('active', a.dataset.tab === v); a.setAttribute('aria-selected', a.dataset.tab === v); });
-    ['graph', 'inbox', 'review', 'library', 'avatars'].forEach((k) => { $(`#panel-${k}`).hidden = k !== v; });
-    $('#capture').hidden = v === 'library' || v === 'avatars';
-    $('#new-record').hidden = v === 'avatars';
+    ['graph', 'inbox', 'review', 'library', 'avatars', ...LAB_VIEWS].forEach((k) => { $(`#panel-${k}`).hidden = k !== v; });
+    $('#capture').hidden = v === 'library' || v === 'avatars' || LAB_VIEWS.includes(v);
+    $('#new-record').hidden = v === 'avatars' || LAB_VIEWS.includes(v);
+    if (labOn()) window.PAIvikLab.render(v);
 
     const inboxN = state.inbox.filter((c) => c.project === state.current && c.status === 'pending').length;
     const reviewN = pending().length;
@@ -766,7 +787,7 @@
     $('#reset').addEventListener('click', async () => {
       await stageChange('Replace workspace with sample data and remove stored files. Export first to retain a copy.', () => {
         Object.assign(state, sample());
-      }, { clear: true });
+      }, { clear: true }, { wipe: true });
       location.hash = 'graph'; render();
     });
   }
@@ -905,7 +926,7 @@
         state.avatars = imported.avatars || [];
         state.current = imported.projects.some(p => p.id === imported.current) ? imported.current : imported.projects[0].id;
         state.selected = imported.nodes.some(n => n.id === imported.selected) ? imported.selected : null;
-      }, { clear: true, put });
+      }, { clear: true, put }, { wipe: true });
       location.hash = 'graph'; render();
     } catch (error) { toast(error.message); }
   }
@@ -921,8 +942,8 @@
       const safe = (Array.isArray(links) ? links : []).filter(l => l && typeof l.name === 'string' && l.name && /^https?:\/\//i.test(l.url || ''));
       if (!safe.length) return;
       const box = $('#service-links');
-      box.innerHTML = '<p class="navlabel">Lab services</p>' + safe.map(l =>
-        `<a href="${esc(l.url)}" target="_blank" rel="noopener"${l.note ? ` title="${esc(l.note)}"` : ''}><span class="ico" aria-hidden="true">↗</span> ${esc(l.name)}</a>`).join('');
+      box.innerHTML = '<details class="more"><summary class="navlabel">More lab services</summary>' + safe.map(l =>
+        `<a href="${esc(l.url)}" target="_blank" rel="noopener"${l.note ? ` title="${esc(l.note)}"` : ''}><span class="ico" aria-hidden="true">↗</span> ${esc(l.name)}</a>`).join('') + '</details>';
       box.hidden = false;
     } catch { /* Links are optional; the workspace works without them. */ }
   }
