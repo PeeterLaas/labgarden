@@ -21,8 +21,11 @@
     <nav class="nav" aria-label="Workspace">
       <p class="navlabel">Workspace</p>
       <a href="#graph" data-nav="graph"><span class="ico" aria-hidden="true">◉</span> Research graph <b id="count-graph">0</b></a>
+      <a href="#ticker" data-nav="ticker" data-lab hidden><span class="ico" aria-hidden="true">≡</span> Ticker</a>
+      <a href="#planner" data-nav="planner" data-lab hidden><span class="ico" aria-hidden="true">⚗</span> Planner</a>
+      <a href="#instruments" data-nav="instruments" data-lab hidden><span class="ico" aria-hidden="true">⏱</span> Instruments <b id="count-instruments"></b></a>
       <a href="#inbox" data-nav="inbox"><span class="ico" aria-hidden="true">⌑</span> Capture inbox <b id="count-inbox">0</b></a>
-      <a href="#review" data-nav="review"><span class="ico" aria-hidden="true">✓</span> Review changes <b id="count-review">0</b></a>
+      <a href="#review" data-nav="review"><span class="ico" aria-hidden="true">✓</span> Review changes <b id="count-review">0</b><b id="count-lab-review" class="labcount" data-lab hidden title="Lab notebook proposals waiting"></b></a>
       <a href="#library" data-nav="library"><span class="ico" aria-hidden="true">▤</span> Resources & protocols</a>
       <a href="#avatars" data-nav="avatars"><span class="ico" aria-hidden="true">◈</span> Category avatars</a>
       <a href="#about" data-nav="about"><span class="ico" aria-hidden="true">i</span> About PAIvik</a>
@@ -49,6 +52,7 @@
   <main class="main">
     <header class="topbar">
       <p class="crumbs">Projects / <b id="crumb-project">—</b></p>
+      <button type="button" class="labtimer" id="lab-timer" hidden></button>
       <p class="privacy">Private · nothing leaves this browser</p>
     </header>
 
@@ -62,6 +66,8 @@
       </div>
       <div class="tabs" role="tablist">
         <a role="tab" href="#graph" data-tab="graph">Graph</a>
+        <a role="tab" href="#ticker" data-tab="ticker" data-lab hidden>Ticker</a>
+        <a role="tab" href="#planner" data-tab="planner" data-lab hidden>Planner</a>
         <a role="tab" href="#inbox" data-tab="inbox">Inbox <span class="badge" id="tab-inbox">0</span></a>
         <a role="tab" href="#review" data-tab="review">Review changes <span class="badge" id="tab-review">0</span></a>
         <a role="tab" href="#library" data-tab="library">Library</a>
@@ -84,7 +90,12 @@
         <ul class="cards" id="inbox-list"></ul>
       </div>
 
+      <div class="panel lab" id="panel-ticker" hidden></div>
+      <div class="panel lab" id="panel-planner" hidden></div>
+      <div class="panel lab" id="panel-instruments" hidden></div>
+
       <div class="panel" id="panel-review" hidden>
+        <p class="labcard" id="lab-review-note" hidden></p>
         <p class="note">Suggestions come from simple, transparent rules in this browser (matching IDs and names). No AI model runs here. Nothing joins the record until you accept it.</p>
         <ul class="cards" id="review-list"></ul>
         <details class="history"><summary>Decided changes <span id="history-count">0</span></summary><ul id="history-list"></ul></details>
@@ -129,6 +140,7 @@
         <li><b>Everything stays in your browser.</b> Records, files and voice notes are stored with IndexedDB on this device. Use Export to keep a copy or move it to another browser.</li>
         <li><b>The gardener is rule-based.</b> It matches IDs, names and file types. It runs no AI model, local or cloud.</li>
         <li><b>Nothing changes without review.</b> Captures wait in the inbox; suggested records and links wait in Review until you accept them.</li>
+        <li><b>Optional lab mode.</b> When a lab hosts this page next to its PAIvik gateway, a Ticker, a PCR Planner and an Instruments board appear. Their data lives on the lab's server and notebook, not in this browser; changes are written in your name with your own notebook key, and model-drafted changes are still approved on the lab's review page. On this public page lab mode is off.</li>
       </ul>
 
       <h2>Where it is going</h2>
@@ -137,7 +149,7 @@
         <article><span>The protocol studio</span><p>Keep a protocol connected to its experiments, then turn the practice into a teachable lesson.</p></article>
         <article><span>The project garden</span><p>A living map of questions, experiments, datasets and decisions across a project.</p></article>
       </div>
-      <p>Planned connections, not yet part of this browser version: the PAIvik lab notebook (eLabFTW API, writes only approved changes), Carpentries Workbench lessons, protocols.io, and small local models for tagging, extraction and link suggestions.</p>
+      <p>Planned connections, not yet part of this browser version: Carpentries Workbench lessons, protocols.io, and small local models for tagging, extraction and link suggestions. The PAIvik lab notebook (eLabFTW) is reached only in lab mode, through the lab's own gateway.</p>
       <p class="principle">Models will change. <em>Your research should endure.</em></p>
     </section>
   </main>
@@ -156,6 +168,7 @@
 
 <script src="change-service.js"></script>
 <script src="resource-library.js"></script>
+<script src="lab.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

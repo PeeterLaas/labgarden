@@ -9,3 +9,4 @@ __pycache__/
 .deps/
 local-data/
 dist/links.json
+dist/lab.json

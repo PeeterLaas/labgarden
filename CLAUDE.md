@@ -38,7 +38,9 @@ Readable, framework-free files in `dist/`:
   - Export is JSON (`app: 'paivik'`, state, files as data URLs); import validates that shape before replacing everything.
 - `style.css`: design tokens on `:root`, redefined under `prefers-color-scheme: dark`; phone layout below 860px.
 
-A lab can host `dist/` with an optional `links.json` beside it (`[{name, url, note}]`), shown as "Lab services" in the sidebar. Never commit a `links.json`: internal addresses stay out of this public repository.
+**Lab mode** (`dist/lab.js`) is off unless the host serves a `lab.json` beside the page (`{"gateway": "gw/"}`, a path on the same address; the lab's server forwards it to its PAIvik gateway, see the private paivik-deploy repo). Then Ticker, Planner and Instruments views appear (`LAB_VIEWS` in `app.js`; `PAIvikLab.render(view)` is called after every render). Lab data is fetched from the gateway's `/api/v1/…` and never stored in IndexedDB; writes happen on the server with the signed-in person's own eLabFTW key; approving model proposals stays on the gateway review page. Never commit a `lab.json`. On the public site (`github.io`) lab mode never starts. Keep the About copy honest about this.
+
+A lab can host `dist/` with an optional `links.json` beside it (`[{name, url, note}]`), shown folded as "More lab services" in the sidebar. Never commit a `links.json`: internal addresses stay out of this public repository.
 
 Research mutations must use `stageChange()` and `dist/change-service.js`; do not add direct graph writes in event handlers. Capture intake, draft checkbox choices and graph layout are separate. The core binds approval to a proposal ID, revision, SHA-256 digest and expected workspace snapshot, then appends an audit event. Browser persistence writes state and file changes in one IndexedDB transaction and rejects stale writes from another tab.
 
