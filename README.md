@@ -18,7 +18,7 @@ Open http://localhost:8000.
 - Capture text notes, files (images, audio, CSV and others, up to 50 MB each) and voice notes recorded in the browser.
 - A rule-based gardener suggests a record type and links (matching names and IDs such as `014`) and flags missing collection times and possible duplicates.
 - Review: accept, edit then accept, or dismiss each suggestion; nothing joins the graph without it. Decided changes are kept as history.
-- Research changes now show an exact before/after preview and require typing `CONFIRM`. Edits, relationships, deletions, project creation, imports and resets use the same approval service. Capturing evidence and moving graph nodes remain separate from committing research changes.
+- Research changes save on the click that asks for them, with no second confirmation. The toast offers **Undo**, and every change, with its exact before/after, stays under **Review → Decided changes**, so mistakes are fixed afterwards. Only replacing the whole workspace (reset, import) asks once. Edits, relationships, deletions, project creation, imports and resets use the same approval service. Capturing evidence and moving graph nodes remain separate from committing research changes.
 - Previews for images, audio and CSV files; download the original file.
 - Several projects, data saved in IndexedDB across reloads, JSON export and import (including files), and reset to the sample.
 - Light and dark mode, keyboard access, and a phone layout.

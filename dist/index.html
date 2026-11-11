@@ -23,7 +23,8 @@
       <a href="#graph" data-nav="graph"><span class="ico" aria-hidden="true">◉</span> Research graph <b id="count-graph">0</b></a>
       <a href="#ticker" data-nav="ticker" data-lab hidden><span class="ico" aria-hidden="true">≡</span> Ticker</a>
       <a href="#planner" data-nav="planner" data-lab hidden><span class="ico" aria-hidden="true">⚗</span> Planner</a>
-      <a href="#instruments" data-nav="instruments" data-lab hidden><span class="ico" aria-hidden="true">⏱</span> Instruments <b id="count-instruments"></b></a>
+      <a href="#seminar" data-nav="seminar" data-lab hidden><span class="ico" aria-hidden="true">◎</span> Seminar</a>
+      <a href="#map" data-nav="map" data-lab hidden><span class="ico" aria-hidden="true">▦</span> Lab map <b id="count-map" class="labcount"></b></a>
       <a href="#inbox" data-nav="inbox"><span class="ico" aria-hidden="true">⌑</span> Capture inbox <b id="count-inbox">0</b></a>
       <a href="#review" data-nav="review"><span class="ico" aria-hidden="true">✓</span> Review changes <b id="count-review">0</b><b id="count-lab-review" class="labcount" data-lab hidden title="Lab notebook proposals waiting"></b></a>
       <a href="#library" data-nav="library"><span class="ico" aria-hidden="true">▤</span> Resources & protocols</a>
@@ -53,6 +54,7 @@
     <header class="topbar">
       <p class="crumbs">Projects / <b id="crumb-project">—</b></p>
       <button type="button" class="labtimer" id="lab-timer" hidden></button>
+      <a class="labtimer labprint" id="lab-print" data-lab hidden target="_blank" rel="noopener" href="#" title="Print today's ticks for the paper notebook">🖨 Print today</a>
       <p class="privacy">Private · nothing leaves this browser</p>
     </header>
 
@@ -93,6 +95,8 @@
       <div class="panel lab" id="panel-ticker" hidden></div>
       <div class="panel lab" id="panel-planner" hidden></div>
       <div class="panel lab" id="panel-instruments" hidden></div>
+      <div class="panel lab" id="panel-map" hidden></div>
+      <div class="panel lab" id="panel-seminar" hidden></div>
 
       <div class="panel" id="panel-review" hidden>
         <p class="labcard" id="lab-review-note" hidden></p>
@@ -139,8 +143,8 @@
       <ul class="facts">
         <li><b>Everything stays in your browser.</b> Records, files and voice notes are stored with IndexedDB on this device. Use Export to keep a copy or move it to another browser.</li>
         <li><b>The gardener is rule-based.</b> It matches IDs, names and file types. It runs no AI model, local or cloud.</li>
-        <li><b>Nothing changes without review.</b> Captures wait in the inbox; suggested records and links wait in Review until you accept them.</li>
-        <li><b>Optional lab mode.</b> When a lab hosts this page next to its PAIvik gateway, a Ticker, a PCR Planner and an Instruments board appear. Their data lives on the lab's server and notebook, not in this browser; changes are written in your name with your own notebook key, and model-drafted changes are still approved on the lab's review page. On this public page lab mode is off.</li>
+        <li><b>Fast, and fixable afterwards.</b> Captures wait in the inbox and suggestions wait in Review, but your own click is the decision: no second confirmation. Undo is offered right after, and every change keeps its exact before/after under Review → Decided changes.</li>
+        <li><b>Optional lab mode.</b> When a lab hosts this page next to its PAIvik gateway, a Ticker, a PCR Planner, a Seminar that puts itself together from the Ticker, and a Lab map of fridges, freezers and instruments appear. Their data lives on the lab's server and notebook, not in this browser; changes are written in your name with your own notebook key, and model-drafted changes are still approved on the lab's review page. On this public page lab mode is off.</li>
       </ul>
 
       <h2>Where it is going</h2>

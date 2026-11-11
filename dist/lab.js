@@ -18,6 +18,7 @@
     on: false, base: '', me: null, cat: null, error: '',
     choice: { title: '', protocol: '', mix: '', primer_f: '', primer_r: '', instrument: '', positive: '', samples: [], more: '', ntc: true, extra_pct: 13, modification: '', volumes: {}, volume_ul: '', template_ul: '' },
     preview: null, runId: null, run: null, people: null, tickWho: 'me', timers: [],
+    map: null, placeKey: null, arranging: false, stashing: false, sem: null, slide: -1,
   };
 
   // ---------- talking to the gateway ----------
@@ -75,10 +76,11 @@
       cfg = await r.json();
     } catch { return; }
     const gw = cfg && typeof cfg.gateway === 'string' ? cfg.gateway : '';
-    if (!/^[a-z0-9/_-]+\/$/i.test(gw)) return;  // only a path on this same address
+    if (gw.startsWith('/') || !/^[a-z0-9/_-]+\/$/i.test(gw)) return;  // only a relative path on this same address (never //host/)
     L.base = gw; L.on = true;
     document.body.classList.add('lab-on');
     $$('[data-lab]').forEach((el) => { el.hidden = false; });
+    const pr = $('#lab-print'); if (pr) pr.href = printToday();
     try {
       L.me = await api('me');
       $('.privacy').textContent = `Lab connected · ${L.me.user}`;
@@ -92,6 +94,12 @@
 
   const currentView = () => location.hash.slice(1) || 'graph';
 
+  // One click for the paper notebook: today's ticks (yours), print dialog opens by itself.
+  function printToday() {
+    const d = new Date(), day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    return `${L.base}ticker/print?day=${day}&user=me&auto=1`;
+  }
+
   async function refreshBadges() {
     if (!L.me) return;
     try {
@@ -100,15 +108,15 @@
       const note = $('#lab-review-note');
       if (note) {
         note.hidden = false;
-        note.innerHTML = `<b>Lab notebook proposals:</b> ${p.pending} waiting. ${p.recent.slice(0, 3).map((r) => `<a href="${esc(r.url)}" target="_blank" rel="noopener">#${r.id} ${esc(r.summary)}</a>`).join(' · ')}
- <a href="${esc(p.review_url)}" target="_blank" rel="noopener">Open the review page ↗</a> <span class="labhint">(approving happens there)</span>`;
+        note.innerHTML = `<b>Lab notebook changes:</b> ${p.pending ? `${p.pending} not written yet.` : 'all written.'} ${p.recent.slice(0, 3).map((r) => `<a href="${esc(r.url)}" target="_blank" rel="noopener">#${r.id} ${esc(r.summary)}</a>`).join(' · ')}
+ <a href="${esc(p.review_url)}" target="_blank" rel="noopener">Open the review page ↗</a> <span class="labhint">(your own changes are written at once; ones drafted by a model wait there for an approver)</span>`;
       }
     } catch { /* badges are a convenience */ }
     if (!L.me.has_key) return;
     try {
-      const ins = await api('instruments');
-      const busy = ins.filter((i) => i.state !== 'free').length;
-      $('#count-instruments').textContent = busy ? `${busy} busy` : '';
+      const m = await api('map');  // one call: instruments in use and open notes on the lab map
+      const busy = m.places.filter((x) => x.state && x.state !== 'free').length;
+      $('#count-map').textContent = [busy ? `${busy} busy` : '', m.open_notes ? `💬${m.open_notes}` : ''].filter(Boolean).join(' ');
       const plans = await api('plans');
       L.timers = plans.mine.filter((p) => p.booking_end && new Date(p.booking_end) > new Date()).map((p) => ({ id: p.id, title: p.plan.title, end: p.booking_end }));
       tickTimers();
@@ -143,6 +151,8 @@
     if (v === 'ticker') renderTicker();
     else if (v === 'planner') renderPlanner();
     else if (v === 'instruments') renderInstruments();
+    else if (v === 'map') renderMap();
+    else if (v === 'seminar') renderSeminar();
   }
 
   // ---------- Instruments ----------
@@ -176,6 +186,7 @@ ${r.later.length ? `<p class="labhint">Later today: ${r.later.map((x) => `${esc(
       const who = feed.owner === null ? 'all' : feed.owner;
       const open = new Set($$('.tick[open]', panel).map((d) => d.id));  // keep what the person had open
       panel.innerHTML = `<div class="labrow"><select data-lab-tickwho aria-label="Whose ticks">${opts}</select>
+<a class="btn" href="${esc(printToday())}" target="_blank" rel="noopener">🖨 Print my day's work</a>
 <span class="labhint">You see what the notebook lets you read: yours, ones shared with you, and as team admin the whole workgroup.</span></div>
 ${mineView ? `<form data-lab-form="tick" class="labcard labform"><input type="text" name="title" required maxlength="200" placeholder="New tick: what did you do?" aria-label="New tick title">
 <textarea name="note" rows="2" maxlength="4000" placeholder="Details (optional)" aria-label="Details"></textarea><div class="labrow"><button class="btn">Add tick</button><span class="labhint">Runs from the Planner appear here by themselves.</span></div></form>` : ''}
@@ -190,10 +201,11 @@ ${Object.entries(days).map(([d, ts]) => `<div class="tickday"><span>${esc(new Da
     const time = new Date(t.at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
     const link = L.me ? `${L.me.notebook}/experiments.php?mode=view&id=${t.id}` : '#';
     return `<details class="tick" id="tick-${t.id}"${t.color ? ` style="border-left-color:#${esc(t.color)}"` : ''}>
-<summary><span class="labhint">${esc(time)}</span> <b>${esc(t.title)}</b>${t.category ? ` <span class="chip">${esc(t.category)}</span>` : ''}${t.plan_id ? ' <span class="chip">PCR plan</span>' : ''}${t.comments.length ? ` <span class="chip">💬 ${t.comments.length}</span>` : ''}
+<summary><span class="labhint">${esc(time)}</span> <b>${esc(t.title)}</b>${t.category ? ` <span class="chip">${esc(t.category)}</span>` : ''}${t.plan_id ? ' <span class="chip">PCR plan</span>' : ''}${t.comments.length ? ` <span class="chip">💬 ${t.comments.length}</span>` : ''}${t.seminar ? ' <span class="chip sem">⚑ seminar</span>' : ''}
 <span class="labhint"> · ${esc(t.who)}</span>
 ${t.follows.map((x) => `<div class="chain">↳ follows ${esc(x.title)}</div>`).join('')}${t.next.map((x) => `<div class="chain">→ next: ${esc(x.title)}</div>`).join('')}</summary>
-<div class="tickbody"><p><a href="${esc(link)}" target="_blank" rel="noopener">Open in notebook ↗</a>${t.plan_id ? ` · <a href="#planner" data-lab-run="${t.plan_id}">Open run in Planner</a>` : ''}</p>
+<div class="tickbody"><p><a href="${esc(link)}" target="_blank" rel="noopener">Open in notebook ↗</a>${t.plan_id ? ` · <a href="#planner" data-lab-run="${t.plan_id}">Open run in Planner</a>` : ''}
+${t.mine ? ` · <button type="button" class="link" data-sem-flag="${t.id}" data-on="${t.seminar ? '0' : '1'}">${t.seminar ? 'Take off the seminar' : '⚑ Show at the seminar'}</button>` : ''}</p>
 ${t.comments.map((c) => `<div class="cm"><b>${esc(c.who)}</b> <span class="labhint">${esc(new Date(c.at).toLocaleString())}</span><br>${esc(c.text)}</div>`).join('')}
 <form data-lab-form="comment" data-exp="${t.id}" class="labrow"><input type="text" name="text" required maxlength="4000" placeholder="Comment…" aria-label="Comment"><button class="link">Comment</button></form>
 ${t.mine ? `<details><summary class="labhint">＋ Attach next tick</summary><form data-lab-form="tick" data-parent="${t.id}" class="labform">
@@ -308,13 +320,10 @@ ${editable ? `<div class="labrow"><button type="button" class="btn" data-lab-sav
     try {
       const shown = JSON.stringify([L.preview.mix, L.preview.tubes]);
       const draft = await api('plans/new', { method: 'POST', body: choiceBody() });
-      if (JSON.stringify([draft.plan.mix, draft.plan.tubes]) !== shown) {
-        L.preview = draft.plan; $('#lab-preview').innerHTML = previewHtml(draft.plan, true);
-        toast('The records changed while you were planning. Check the numbers and save again.');
-        return;
-      }
+      // No second check-and-confirm: save what the notebook records give now, and say so if that differs from the screen.
+      const changed = JSON.stringify([draft.plan.mix, draft.plan.tubes]) !== shown;
       const saved = await api(`plans/${draft.id}/save`, { method: 'POST', body: { hash: draft.hash } });
-      toast('Saved to the notebook');
+      toast(changed ? 'Saved. The records had changed, so the numbers were updated: check the run page.' : 'Saved to the notebook');
       L.choice.samples = []; L.choice.title = ''; L.choice.more = '';
       openRun(saved.id);
     } catch (err) { toast(err.message); } finally { btn.disabled = false; btn.textContent = 'Save run to the notebook'; }
@@ -380,6 +389,228 @@ ${p.mine ? '<div class="labrow"><input type="text" name="note" maxlength="500" p
 <label class="pick"><input type="radio" name="mode" value="wg"> The whole workgroup</label><div class="labrow"><button class="btn">Share</button></div></form>`;
   }
 
+  // ---------- Lab map: fridges, freezers, instruments; notes; today's products ----------
+  const ICON = { freezer80: '❄❄', freezer: '❄', fridge: '▯', cabinet: '▦', shelf: '▤', bench: '▭', instrument: '⚙', storage: '▢' };
+  // Names wrap onto two lines inside the box; longer ones end in an ellipsis (the full name is in the side panel).
+  function lines(t, w) {
+    const max = Math.max(5, Math.floor(w / 8.6)), words = String(t).split(/\s+/), out = [''];
+    for (const word of words) {
+      const cur = out[out.length - 1];
+      if (!cur) out[out.length - 1] = word; else if ((cur + ' ' + word).length <= max) out[out.length - 1] = cur + ' ' + word; else out.push(word);
+    }
+    const two = out.slice(0, 2).map((l) => (l.length > max ? l.slice(0, max - 1) + '…' : l));
+    if (out.length > 2) two[1] = two[1].slice(0, max - 1) + '…';
+    return two;
+  }
+
+  async function renderMap() {
+    const panel = $('#panel-map');
+    if (!panel.innerHTML) panel.innerHTML = '<p class="labhint">Loading the lab map…</p>';
+    try {
+      L.map = await api('map');
+      drawMap(panel);
+      if (L.placeKey) openPlace(L.placeKey);
+    } catch (err) { problem(panel, err); }
+  }
+
+  function drawMap(panel) {
+    const m = L.map;
+    const kinds = Object.entries(m.kinds).filter(([k]) => k !== 'instrument').map(([k, v]) => `<option value="${esc(k)}">${esc(v)}</option>`).join('');
+    const box = (p) => {
+      const st = p.state ? ` ${p.state.replace(' ', '-')}` : '';
+      const badges = [p.count ? `${p.count}` : '', p.notes ? `💬${p.notes}` : ''].filter(Boolean).join(' ');
+      return `<g class="place ${esc(p.kind)}${st}${p.key === L.placeKey ? ' sel' : ''}" data-place="${esc(p.key)}" transform="translate(${p.x} ${p.y})" tabindex="0" role="button"
+ aria-label="${esc(p.name)}${p.count ? `, ${p.count} stored` : ''}${p.notes ? `, ${p.notes} notes` : ''}${p.state ? `, ${esc(p.state)}` : ''}">
+<rect width="${p.w}" height="${p.h}" rx="10"/><text x="10" y="28" class="ico">${ICON[p.kind] || '▢'}</text>
+${lines(p.name, p.w - 16).map((l, i, a) => `<text x="10" y="${p.h - 12 - (a.length - 1 - i) * 18}" class="nm">${esc(l)}</text>`).join('')}${badges ? `<text x="${p.w - 10}" y="26" class="bd" text-anchor="end">${esc(badges)}</text>` : ''}</g>`;
+    };
+    panel.innerHTML = `<div class="labrow"><b>Lab map</b>
+<span class="labhint">${m.places.length ? 'Tap a fridge, freezer or instrument to see what is in it, leave a note, or put today’s products there.' : 'No storage yet: add your first fridge or freezer.'}</span>
+<button type="button" class="link" data-map-arrange>${L.arranging ? '✓ Done arranging' : '✥ Arrange the room'}</button>
+<a class="link" href="#instruments">Instrument list</a></div>
+${L.arranging || !m.places.length ? `<form data-lab-form="unit" class="labrow labcard"><input name="name" required maxlength="100" placeholder="New: e.g. Freezer −20 °C by the door" aria-label="Name of the new fridge or freezer">
+<select name="kind" aria-label="Kind">${kinds}</select><button class="btn">Add</button><span class="labhint">${L.arranging ? 'Drag boxes to where they stand; changes save when you press Done.' : ''}</span></form>` : ''}
+<div class="labmap-wrap"><div class="labmap-scroll"><svg class="labmap${L.arranging ? ' arranging' : ''}" viewBox="0 0 ${m.w} ${m.h}" role="group" aria-label="Floorplan">
+<rect class="room" x="4" y="4" width="${m.w - 8}" height="${m.h - 8}" rx="14"/>${m.places.map(box).join('')}</svg></div>
+<aside id="lab-place" class="labcard labplace"${L.placeKey ? '' : ' hidden'}></aside></div>`;
+  }
+
+  const notebookLink = (entity, id) => L.me && L.me.notebook ? `${L.me.notebook}/${entity === 'experiments' ? 'experiments' : 'database'}.php?mode=view&id=${encodeURIComponent(id)}` : '#';
+
+  async function openPlace(key) {
+    L.placeKey = key; L.stashing = false;
+    $$('.labmap .place').forEach((g) => g.classList.toggle('sel', g.dataset.place === key));
+    const side = $('#lab-place'); if (!side) return;
+    side.hidden = false; side.innerHTML = '<p class="labhint">Opening…</p>';
+    try { const pl = await api('map/place?key=' + encodeURIComponent(key)); if (L.placeKey === key) drawPlace(side, pl); }
+    catch (err) { side.innerHTML = `<p>${esc(err.message)}</p>`; }
+  }
+
+  function notesHtml(pl) {
+    const open = pl.notes.filter((n) => !n.done_at), done = pl.notes.filter((n) => n.done_at);
+    return `<h4>Notes for others</h4>${open.map((n) => `<div class="pnote"><p>${esc(n.text)}</p><p class="labhint">${esc(n.name)} · ${esc(when(n.at))}
+<button type="button" class="link" data-note-done="${n.id}">✓ Done</button></p></div>`).join('') || '<p class="labhint">No open notes.</p>'}
+<form data-lab-form="note" class="labform"><textarea name="text" rows="2" maxlength="1000" required placeholder="e.g. Door does not close properly · Out of Taq, ordered" aria-label="New note"></textarea>
+<div class="labrow"><button class="btn">Leave note</button></div></form>
+${done.length ? `<details><summary class="labhint">${done.length} done</summary>${done.map((n) => `<p class="labhint"><s>${esc(n.text)}</s> · ${esc(n.name)}</p>`).join('')}</details>` : ''}`;
+  }
+
+  function drawPlace(side, pl) {
+    const head = `<div class="labrow"><b>${ICON[pl.type === 'instrument' ? 'instrument' : (L.map.places.find((p) => p.key === pl.key) || {}).kind] || '▢'} ${esc(pl.name)}</b>
+<button type="button" class="link" data-place-close aria-label="Close">✕</button></div>`;
+    if (pl.type === 'instrument') {
+      side.innerHTML = `${head}<p><span class="chip inst-${esc(pl.state.replace(' ', '-'))}">${esc(pl.state)}</span>${pl.responsible ? ` <span class="labhint">Responsible: ${esc(pl.responsible)}</span>` : ''}</p>
+${pl.now.map((x) => `<p>${esc(x.who)}: ${esc(x.title)} · until ${esc(x.until)}</p>`).join('')}
+${pl.later.length ? `<p class="labhint">Later today: ${pl.later.map((x) => `${esc(x.from)}–${esc(x.until)} ${esc(x.who)}`).join(', ')}</p>` : ''}
+<p class="labrow"><a class="btn" href="#planner">Plan a run</a><a class="link" href="${esc(notebookLink('items', pl.id))}" target="_blank" rel="noopener">Book in the notebook ↗</a></p>${notesHtml(pl)}`;
+      return;
+    }
+    const rows = pl.sections.map((s) => `<div class="psec" style="--d:${s.depth}"><p class="labhint">${s.depth ? '└ ' : ''}${esc(s.name)}</p>
+${s.items.map((it) => `<div class="labrow prow"><a href="${esc(notebookLink(it.entity, it.id))}" target="_blank" rel="noopener">${it.entity === 'experiments' ? '⚗ ' : ''}${esc(it.title)}</a>
+<span class="labhint">${esc(num(it.qty))}${it.unit && it.unit !== '•' ? ' ' + esc(it.unit) : ''} · ${esc(it.who)}</span>
+<button type="button" class="link" data-takeout="${esc(it.entity)}:${it.id}:${it.container}" title="Used up, thrown away or moved">Take out</button></div>`).join('')}</div>`).join('');
+    const count = pl.sections.reduce((n, s) => n + s.items.length, 0);
+    side.innerHTML = `${head}
+<button type="button" class="btn big" data-stash="${pl.id}">⬇ Put today’s products here</button><div id="lab-stash"></div>
+<h4>Inside (${count})</h4>${count ? rows : `${rows}<p class="labhint">Empty, as far as the notebook knows.</p>`}
+<form data-lab-form="shelf" class="labrow"><input name="name" required maxlength="100" placeholder="＋ Shelf or box inside" aria-label="New shelf or box">
+<select name="parent" aria-label="Inside">${pl.sections.map((s) => `<option value="${s.id}">${esc('· '.repeat(s.depth) + s.name)}</option>`).join('')}</select><button class="btn">Add</button></form>
+${notesHtml(pl)}`;
+  }
+
+  async function openStash(unit) {
+    const box = $('#lab-stash'); if (!box) return;
+    if (L.stashing) { L.stashing = false; box.innerHTML = ''; return; }
+    L.stashing = true; box.innerHTML = '<p class="labhint">Finding today’s runs…</p>';
+    try {
+      const runs = await api('map/today');
+      box.innerHTML = runs.length ? `<form data-lab-form="stash" data-unit="${esc(unit)}" class="labform">
+${runs.map((r) => `<label class="pick"><input type="checkbox" name="pick" value="${r.id}" checked> ${esc(r.title)}
+<input class="n" type="number" name="qty_${r.id}" min="1" max="999" value="${r.tubes}" aria-label="Tubes"> tubes</label>`).join('')}
+<div class="labrow"><button class="btn">Store here</button><span class="labhint">Each run then shows where its tubes went.</span></div></form>`
+        : '<p class="labhint">No ticks from you today yet. Runs saved from the Planner and ticks you add appear here.</p>';
+    } catch (err) { box.innerHTML = `<p>${esc(err.message)}</p>`; }
+  }
+
+  // dragging boxes while arranging (pointer events: mouse, pen and touch)
+  let drag = null;
+  document.addEventListener('pointerdown', (ev) => {
+    const g = ev.target.closest('.labmap.arranging .place'); if (!g) return;
+    const svg = g.ownerSVGElement, pt = svg.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY;
+    const at = pt.matrixTransform(svg.getScreenCTM().inverse()), p = L.map.places.find((x) => x.key === g.dataset.place);
+    drag = { g, p, dx: at.x - p.x, dy: at.y - p.y, svg }; g.setPointerCapture(ev.pointerId); ev.preventDefault();
+  });
+  document.addEventListener('pointermove', (ev) => {
+    if (!drag) return;
+    const pt = drag.svg.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY;
+    const at = pt.matrixTransform(drag.svg.getScreenCTM().inverse());
+    drag.p.x = Math.round(Math.min(Math.max(at.x - drag.dx, 0), L.map.w - drag.p.w) / 5) * 5;
+    drag.p.y = Math.round(Math.min(Math.max(at.y - drag.dy, 0), L.map.h - drag.p.h) / 5) * 5;
+    drag.g.setAttribute('transform', `translate(${drag.p.x} ${drag.p.y})`); drag.p.moved = true;
+  });
+  document.addEventListener('pointerup', () => { drag = null; });
+  document.addEventListener('keydown', (ev) => {
+    const g = ev.target.closest && ev.target.closest('.labmap .place');
+    if (g && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); openPlace(g.dataset.place); }
+  });
+
+  async function mapClick(t) {
+    if (t.matches('[data-map-arrange]')) {
+      if (L.arranging) {
+        const moved = L.map.places.filter((p) => p.moved).map(({ key, kind, x, y, w, h }) => ({ key, kind, x, y, w, h }));
+        if (moved.length) { await api('map/layout', { method: 'POST', body: { places: moved } }); toast('Room layout saved'); }
+      }
+      L.arranging = !L.arranging; drawMap($('#panel-map')); if (L.placeKey && !L.arranging) openPlace(L.placeKey);
+    } else if (t.matches('[data-place]')) { if (!L.arranging) openPlace(t.dataset.place); }
+    else if (t.matches('[data-place-close]')) { L.placeKey = null; $('#lab-place').hidden = true; $$('.labmap .place.sel').forEach((g) => g.classList.remove('sel')); }
+    else if (t.matches('[data-stash]')) openStash(t.dataset.stash);
+    else if (t.matches('[data-note-done]')) { await api(`map/notes/${t.dataset.noteDone}/done`, { method: 'POST', body: {} }); renderMap(); refreshBadges(); }
+    else if (t.matches('[data-takeout]')) {
+      const [entity, id, container] = t.dataset.takeout.split(':');
+      await api('map/takeout', { method: 'POST', body: { entity, id: Number(id), container: Number(container) } });
+      toast('Taken out. The record itself stays in the notebook.'); renderMap();
+    }
+  }
+
+  // ---------- Seminar: Never Ending Research Communication ----------
+  const WHY = { flagged: '⚑ flagged', result: '✓ result', question: '? open question' };
+  const dayName = (iso) => new Date(iso + 'T12:00').toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
+
+  async function renderSeminar() {
+    const panel = $('#panel-seminar');
+    if (!panel.innerHTML) panel.innerHTML = '<p class="labhint">Putting the seminar together…</p>';
+    try { L.sem = await api('seminar'); drawSeminar(panel); } catch (err) { problem(panel, err); }
+  }
+
+  const semItems = () => (L.sem ? L.sem.people.flatMap((p) => p.items.map((t) => ({ ...t, person: p.name }))) : []);
+
+  function semItem(t) {
+    const gel = t.plan_id ? `<img class="semgel" src="${esc(L.base)}api/v1/plans/${t.plan_id}/gel" alt="Gel picture of ${esc(t.title)}" loading="lazy" onerror="this.remove()">` : '';
+    const last = t.comments.filter((c) => !c.text.startsWith('[Seminar ')).slice(-2);  // seminar remarks are listed below as notes
+    return `<div class="semitem" id="sem-${t.id}"><div class="labrow"><b>${esc(t.title)}</b>${t.why.map((w) => `<span class="chip ${esc(w)}">${esc(WHY[w] || w)}</span>`).join('')}
+<span class="labhint">${esc(when(t.at))}</span></div>
+${t.excerpt ? `<p class="labhint">${esc(t.excerpt)}</p>` : ''}${gel}
+${last.map((c) => `<div class="cm"><b>${esc(c.who)}</b>: ${esc(c.text)}</div>`).join('')}
+${t.notes.map((n) => `<div class="cm semnote"><b>${esc(n.name)}</b> at the seminar: ${esc(n.text)}</div>`).join('')}
+<form data-lab-form="semnote" data-exp="${t.id}" class="labrow"><input type="text" name="text" required maxlength="2000" placeholder="Remark or next step (goes to their Ticker)" aria-label="Seminar remark on ${esc(t.title)}"><button class="link">Add</button></form></div>`;
+  }
+
+  function drawSeminar(panel) {
+    const d = L.sem, s = d.seminar;
+    panel.innerHTML = `<div class="labcard semhead"><div class="labrow"><h2>${esc(dayName(s.day))}</h2>
+<span class="labhint">${d.count} on the agenda · everything since ${esc(new Date(d.since).toLocaleDateString())}</span></div>
+<p class="labhint">The agenda builds itself from the Ticker: ticks people flagged (⚑ in their Ticker), runs with a result, and ticks with an open question. Remarks made here go back to that person’s Ticker as comments, so the discussion carries on.</p>
+<div class="labrow"><button type="button" class="btn" data-sem-present ${d.count ? '' : 'disabled'}>▶ Present</button>
+<button type="button" class="link" data-sem-print>🖨 Handout</button>
+<form data-lab-form="semday" class="labrow"><label class="labhint">Date <input type="date" name="day" value="${esc(s.day)}" required></label><button class="link">Move</button></form>
+<button type="button" class="link" data-sem-close>Close and open the next one</button>
+${d.guide ? `<a class="link" href="${esc(d.guide)}" target="_blank" rel="noopener">How we run the discussion ↗</a>` : ''}</div></div>
+${d.people.map((p) => `<section class="labcard semperson"><h3>${esc(p.name)} <span class="labhint">${p.items.length}</span></h3>${p.items.map(semItem).join('')}</section>`).join('')
+  || '<p class="labhint">Nothing yet. Flag a tick with ⚑ in the Ticker, or read a gel in the Planner, and it appears here.</p>'}
+${d.past.length ? `<details class="labcard"><summary>Earlier seminars</summary>${d.past.map((x) => `<p><button type="button" class="link" data-sem-minutes="${x.id}">${esc(x.title)}</button></p>`).join('')}<div id="sem-minutes"></div></details>` : ''}
+${d.not_on_agenda ? `<p class="labhint">${d.not_on_agenda} other recent ticks are not on the agenda (no flag, result or question).</p>` : ''}`;
+  }
+
+  function present(i) {
+    const items = semItems(); let ov = $('#sem-present');
+    if (i < 0 || i >= items.length) { if (ov) ov.remove(); L.slide = -1; document.body.classList.remove('sem-presenting'); renderSeminar(); return; }
+    L.slide = i;
+    if (!ov) { ov = document.createElement('div'); ov.id = 'sem-present'; ov.className = 'sempresent'; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-label', 'Seminar presentation'); document.body.append(ov); document.body.classList.add('sem-presenting'); }
+    const t = items[i];
+    ov.innerHTML = `<div class="semslide"><p class="labhint">${esc(t.person)} · ${i + 1} / ${items.length}</p><h1>${esc(t.title)}</h1>
+<p>${t.why.map((w) => `<span class="chip ${esc(w)}">${esc(WHY[w] || w)}</span>`).join(' ')}</p>
+${t.plan_id ? `<img src="${esc(L.base)}api/v1/plans/${t.plan_id}/gel" alt="Gel picture" onerror="this.remove()">` : ''}
+${t.excerpt ? `<p class="big">${esc(t.excerpt)}</p>` : ''}
+${t.comments.filter((c) => !c.text.startsWith('[Seminar ')).slice(-3).map((c) => `<div class="cm"><b>${esc(c.who)}</b>: ${esc(c.text)}</div>`).join('')}
+${t.notes.map((n) => `<div class="cm semnote"><b>${esc(n.name)}</b>: ${esc(n.text)}</div>`).join('')}
+<form data-lab-form="semnote" data-exp="${t.id}" data-present="1" class="labrow"><input type="text" name="text" required maxlength="2000" placeholder="Remark or next step for ${esc(t.person)}" aria-label="Remark"><button class="btn">Add</button></form></div>
+<div class="semnav"><button type="button" class="btn" data-sem-slide="${i - 1}" ${i ? '' : 'disabled'}>← Back</button><button type="button" class="link" data-sem-slide="-1">✕ End</button><button type="button" class="btn" data-sem-slide="${i + 1}">${i + 1 < items.length ? 'Next →' : 'Finish'}</button></div>`;
+    $('button[data-sem-slide]', ov) && ov.querySelector(`[data-sem-slide="${i + 1}"]`).focus();
+  }
+  document.addEventListener('keydown', (ev) => {
+    if (L.slide < 0 || ev.target.matches('input,textarea')) return;
+    if (ev.key === 'ArrowRight' || ev.key === 'PageDown') present(L.slide + 1);
+    else if (ev.key === 'ArrowLeft' || ev.key === 'PageUp') present(Math.max(0, L.slide - 1));
+    else if (ev.key === 'Escape') present(-1);
+  });
+
+  async function semClick(t) {
+    if (t.matches('[data-sem-flag]')) {
+      await api('seminar/flag', { method: 'POST', body: { exp: Number(t.dataset.semFlag), on: t.dataset.on === '1' } });
+      toast(t.dataset.on === '1' ? 'On the next seminar' : 'Taken off the seminar'); renderTicker();
+    } else if (t.matches('[data-sem-present]')) present(0);
+    else if (t.matches('[data-sem-slide]')) present(Number(t.dataset.semSlide));
+    else if (t.matches('[data-sem-print]')) { document.body.classList.add('sem-print'); window.print(); document.body.classList.remove('sem-print'); }
+    else if (t.matches('[data-sem-close]')) {
+      const r = await api('seminar/close', { method: 'POST', body: {} });
+      toast(`Minutes kept. Next seminar: ${dayName(r.next.day)}`); renderSeminar();
+    } else if (t.matches('[data-sem-minutes]')) {
+      const m = await api('seminar/' + t.dataset.semMinutes), box = $('#sem-minutes');
+      const mm = m.minutes || { people: [] };
+      box.innerHTML = `<h4>${esc(m.title)}</h4>${mm.people.map((p) => `<p><b>${esc(p.name)}</b></p><ul>${p.items.map((it) => `<li>${esc(it.title)}${it.notes.map((n) => `<br><span class="labhint">${esc(n.name)}: ${esc(n.text)}</span>`).join('')}</li>`).join('')}</ul>`).join('') || '<p class="labhint">Nothing was on the agenda.</p>'}`;
+    }
+  }
+
   // ---------- events (one delegated listener each, like app.js) ----------
   document.addEventListener('change', (ev) => {
     const t = ev.target;
@@ -395,6 +626,10 @@ ${p.mine ? '<div class="labrow"><input type="text" name="note" maxlength="500" p
   document.addEventListener('input', (ev) => { if (ev.target.closest('[data-lab-form="plan"]') && ev.target.matches('input[type=text],input[type=number],textarea')) updatePreview(); });
 
   document.addEventListener('click', (ev) => {
+    const sm = ev.target.closest('[data-sem-flag],[data-sem-present],[data-sem-slide],[data-sem-print],[data-sem-close],[data-sem-minutes]');
+    if (sm) { semClick(sm).catch((err) => toast(err.message)); return; }
+    const m = ev.target.closest('[data-map-arrange],[data-place],[data-place-close],[data-stash],[data-note-done],[data-takeout]');
+    if (m) { mapClick(m).catch((err) => toast(err.message)); return; }
     const t = ev.target.closest('[data-lab-save],[data-lab-run],[data-lab-back],[data-lab-retry],#lab-timer');
     if (!t) return;
     if (t.matches('[data-lab-save]')) saveRun(t);
@@ -431,6 +666,25 @@ ${p.mine ? '<div class="labrow"><input type="text" name="note" maxlength="500" p
         const calls = {}; L.run.plan.lanes.forEach((l) => { const v = fd.get('lane_' + l.lane); if (v) calls[l.lane] = v; });
         L.run = await api(`plans/${L.runId}/results`, { method: 'POST', body: { calls, note: fd.get('note') || '' } });
         toast('Result written to the notebook'); renderPlanner();
+      } else if (kind === 'unit') {
+        await api('map/units', { method: 'POST', body: { name: fd.get('name'), kind: fd.get('kind') } });
+        toast('Added. Drag it to where it stands.'); L.arranging = true; renderMap();
+      } else if (kind === 'shelf') {
+        await api('map/units', { method: 'POST', body: { name: fd.get('name'), parent: fd.get('parent') } });
+        toast('Shelf added'); renderMap();
+      } else if (kind === 'note') {
+        await api('map/notes', { method: 'POST', body: { key: L.placeKey, text: fd.get('text') } });
+        toast('Note left for others'); renderMap(); refreshBadges();
+      } else if (kind === 'stash') {
+        const picks = fd.getAll('pick').map((id) => ({ id: Number(id), qty: Number(fd.get('qty_' + id) || 1) }));
+        const r = await api('map/stash', { method: 'POST', body: { unit: Number(f.dataset.unit), picks } });
+        toast(`Stored ${r.stored.length} run${r.stored.length === 1 ? '' : 's'} here`); renderMap();
+      } else if (kind === 'semnote') {
+        await api('seminar/note', { method: 'POST', body: { exp: Number(f.dataset.exp), text: fd.get('text') } });
+        toast('Remark added; it is in their Ticker now');
+        if (f.dataset.present) { const i = L.slide; L.sem = await api('seminar'); present(i); f.reset(); } else renderSeminar();
+      } else if (kind === 'semday') {
+        await api('seminar/day', { method: 'POST', body: { day: fd.get('day') } }); toast('Seminar moved'); renderSeminar();
       } else if (kind === 'share') {
         L.run = await api(`plans/${L.runId}/share`, { method: 'POST', body: { mode: fd.get('mode'), users: fd.getAll('user') } });
         toast('Shared'); renderPlanner();
