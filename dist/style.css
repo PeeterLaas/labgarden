@@ -373,3 +373,11 @@ select.manuadd{font:inherit;font-size:13px;border:1px solid var(--line);border-r
 .labgraph .ge{fill:none;stroke:var(--edge);stroke-width:1.5;opacity:.7}.labgraph .ge.next{stroke:var(--accent);stroke-width:2;opacity:1}
 .labgraph .ge.on{stroke:var(--accent);stroke-width:3;opacity:1}.labgraph .gah{fill:var(--accent)}
 #lab-node{margin-top:12px}
+/* Planner: protocol archive reference */
+.refpick{grid-column:1/-1}
+.refpick input[type=search]{width:100%;margin:6px 0}
+.refresults{max-height:260px;overflow:auto;display:flex;flex-direction:column;gap:4px}
+.refrow{display:flex;flex-direction:column;align-items:flex-start;text-align:left;font:inherit;font-size:14px;color:var(--text);background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;cursor:pointer}
+.refrow:hover,.refrow:focus-visible{border-color:var(--accent)}
+.refchip{display:flex;gap:8px;align-items:flex-start;justify-content:space-between;border:1px solid var(--accent);border-radius:8px;padding:6px 10px;background:var(--accent-tint)}
+.refchip small{display:block}
