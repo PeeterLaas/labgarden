@@ -70,7 +70,7 @@ The browser and companion are separate stores using the same data schema and app
 2. In the local Shiny console, upload the export and select **Prepare import for review**.
 3. Load and confirm that import proposal. Existing local records are replaced only after approval; local audit history is retained.
 4. Search and draft through MCP, then review changes in Shiny.
-5. Export the local workspace and import it into the browser, reviewing the replacement preview there.
+5. Export the local workspace and import it into the browser; the browser asks once before replacing its workspace.
 
 The companion rejects file-bearing imports instead of losing or uploading attachments. Keep recordings, photos and file-bearing workspaces in the browser for now. Imported history is not treated as locally verified approval history.
 

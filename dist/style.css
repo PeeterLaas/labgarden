@@ -360,3 +360,16 @@ body.sem-presenting{overflow:hidden}
 .manuoutline .src{color:var(--accent);font-size:.85em;white-space:nowrap}
 .mdtable{overflow-x:auto}.mdtable table{border-collapse:collapse;font-size:14px}.mdtable th,.mdtable td{border:1px solid var(--line);padding:4px 8px;text-align:left}
 select.manuadd{font:inherit;font-size:13px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--text);padding:2px 4px}
+/* Lab projects graph (lab mode) */
+.labgraph{display:block;width:100%;min-width:760px;height:auto;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius)}
+.labgraph .col{fill:var(--muted);font:500 13px Rubik,system-ui,sans-serif;text-transform:uppercase;letter-spacing:.04em}
+.labgraph .col.sub{text-transform:none;letter-spacing:0;font-weight:400}
+.labgraph .gn{cursor:pointer;outline:none}
+.labgraph .gn rect{fill:var(--surface-2);stroke:var(--c,var(--rec-stroke));stroke-width:1.5}
+.labgraph .gn.project rect{fill:var(--accent);stroke:var(--accent)}.labgraph .gn.project text{fill:var(--on-accent)}
+.labgraph .gn.run rect{stroke-width:2}
+.labgraph .gn:hover rect,.labgraph .gn:focus-visible rect,.labgraph .gn.sel rect{stroke-width:3.5}
+.labgraph .gn text{pointer-events:none}.labgraph .gn .t{fill:var(--text);font:14px Rubik,system-ui,sans-serif}.labgraph .gn .s{fill:var(--muted);font:12px Rubik,system-ui,sans-serif}
+.labgraph .ge{fill:none;stroke:var(--edge);stroke-width:1.5;opacity:.7}.labgraph .ge.next{stroke:var(--accent);stroke-width:2;opacity:1}
+.labgraph .ge.on{stroke:var(--accent);stroke-width:3;opacity:1}.labgraph .gah{fill:var(--accent)}
+#lab-node{margin-top:12px}

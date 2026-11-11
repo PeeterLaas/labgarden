@@ -16,9 +16,9 @@
 
   const L = {
     on: false, base: '', me: null, cat: null, error: '',
-    choice: { title: '', protocol: '', mix: '', primer_f: '', primer_r: '', instrument: '', positive: '', samples: [], more: '', ntc: true, extra_pct: 13, modification: '', volumes: {}, volume_ul: '', template_ul: '' },
+    choice: { title: '', project: '', protocol: '', mix: '', primer_f: '', primer_r: '', instrument: '', positive: '', samples: [], more: '', ntc: true, extra_pct: 13, modification: '', volumes: {}, volume_ul: '', template_ul: '' },
     preview: null, runId: null, run: null, people: null, tickWho: 'me', timers: [],
-    askFound: null, manus: null, manuId: null, map: null, level: 0, placeKey: null, arranging: false, stashing: false, sem: null, slide: -1,
+    askFound: null, manus: null, manuId: null, projId: null, graph: null, map: null, level: 0, placeKey: null, arranging: false, stashing: false, sem: null, slide: -1,
   };
 
   // ---------- talking to the gateway ----------
@@ -160,6 +160,7 @@
     else if (v === 'map') renderMap();
     else if (v === 'seminar') renderSeminar();
     else if (v === 'manuscripts') renderManuscripts();
+    else if (v === 'labgraph') renderLabGraph();
   }
 
   // ---------- Instruments ----------
@@ -253,6 +254,7 @@ ${t.mine ? `<details><summary class="labhint">＋ Attach next tick</summary><for
 <h2>PCR</h2>
 <label>Run name <input type="text" name="title" maxlength="200" value="${esc(c.title)}" placeholder="e.g. 16S colony PCR, plate 3"></label>
 <div class="labgrid">
+${(cat.projects || []).length ? `<label>Project <select name="project">${opts(cat.projects, c.project, '— no project —')}</select></label>` : ''}
 <label>Protocol <select name="protocol">${opts(cat.protocols, c.protocol, 'Default PCR recipe')}</select></label>
 <label>Polymerase / master mix <select name="mix">${opts(cat.mix, c.mix)}</select></label>
 <label>Forward primer <select name="primer_f">${opts(cat.primers, c.primer_f)}</select></label>
@@ -280,7 +282,7 @@ ${t.mine ? `<details><summary class="labhint">＋ Attach next tick</summary><for
     const f = $('[data-lab-form="plan"]');
     if (!f) return;
     const c = L.choice, fd = new FormData(f);
-    ['title', 'protocol', 'mix', 'primer_f', 'primer_r', 'instrument', 'positive', 'modification', 'more', 'extra_pct'].forEach((k) => { c[k] = fd.get(k) ?? ''; });
+    ['title', 'project', 'protocol', 'mix', 'primer_f', 'primer_r', 'instrument', 'positive', 'modification', 'more', 'extra_pct'].forEach((k) => { c[k] = fd.get(k) ?? ''; });
     c.ntc = fd.get('ntc') === 'on';
   }
 
@@ -547,6 +549,8 @@ ${runs.map((r) => `<label class="pick"><input type="checkbox" name="pick" value=
   document.addEventListener('keydown', (ev) => {
     const g = ev.target.closest && ev.target.closest('.labmap .place');
     if (g && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); openPlace(g.dataset.place); }
+    const gn = ev.target.closest && ev.target.closest('.labgraph [data-node]');
+    if (gn && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); showNode(gn.dataset.node); }
   });
 
   async function mapClick(t) {
@@ -735,6 +739,62 @@ ${m.drafts.map((d) => `<details class="labcard"><summary>Prose draft · ${esc(wh
     }
   }
 
+  // ---------- Lab projects: the project graph from notebook links ----------
+  async function renderLabGraph() {
+    const panel = $('#panel-labgraph');
+    if (!panel.innerHTML) panel.innerHTML = '<p class="labhint">Loading lab projects…</p>';
+    try {
+      const list = await api('projects');
+      if (!L.projId && list.length) L.projId = list[0].id;
+      const g = L.projId ? await api('projects/' + L.projId) : null;
+      L.graph = g;
+      panel.innerHTML = `<div class="labrow"><select data-proj-pick aria-label="Lab project">${list.map((p) => `<option value="${p.id}"${p.id === L.projId ? ' selected' : ''}>${esc(p.title)} (${p.runs})</option>`).join('')}</select>
+<form data-lab-form="project" class="labrow"><input name="title" required maxlength="200" placeholder="New lab project" aria-label="New lab project name"><button class="btn">Add</button></form>
+<span class="labhint">From the lab notebook: a run belongs to a project when it links to it (pick the project in the Planner).</span></div>
+${g ? graphSvg(g) : '<p class="labhint">No lab projects in the notebook yet.</p>'}<aside id="lab-node" class="labcard" hidden></aside>`;
+    } catch (err) { problem(panel, err); }
+  }
+
+  function graphSvg(g) {
+    const runs = g.nodes.filter((n) => n.kind === 'run'), mats = g.nodes.filter((n) => n.kind === 'material');
+    const rowH = 54, top = 40, H = Math.max(runs.length, mats.length + new Set(mats.map((m) => m.category)).size, 3) * rowH + top + 20;
+    const pos = {}; pos[`p:${g.project.id}`] = { x: 30, y: Math.max(top, top + (Math.max(runs.length, 1) * rowH) / 2 - 40), w: 240, h: 78 };
+    runs.forEach((n, i) => { pos[n.id] = { x: 360, y: top + i * rowH, w: 280, h: 42 }; });
+    let y = top, cat = null; const heads = [];
+    mats.forEach((n) => { if (n.category !== cat) { cat = n.category; heads.push({ y, t: cat || 'Other' }); y += 26; } pos[n.id] = { x: 740, y, w: 230, h: 36 }; y += 44; });
+    const H2 = Math.max(H, y + 20);
+    const edge = (e) => {
+      const a = pos[e.from], b = pos[e.to]; if (!a || !b) return '';
+      if (e.kind === 'next') { const x = a.x, y1 = a.y + a.h / 2, y2 = b.y + b.h / 2; return `<path class="ge next" data-from="${e.from}" data-to="${e.to}" d="M${x} ${y1} C${x - 40} ${y1}, ${x - 40} ${y2}, ${x} ${y2}" marker-end="url(#gar)"/>`; }
+      const x1 = a.x + a.w, y1 = a.y + a.h / 2, x2 = b.x, y2 = b.y + b.h / 2, mx = (x1 + x2) / 2;
+      return `<path class="ge ${e.kind}" data-from="${e.from}" data-to="${e.to}" d="M${x1} ${y1} C${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}"/>`;
+    };
+    const node = (n) => { const p = pos[n.id]; if (!p) return '';
+      const sub = n.kind === 'run' ? `${n.date}${n.who ? ' · ' + n.who : ''}${n.category ? ' · ' + n.category : ''}` : n.kind === 'project' ? (n.status || 'Lab project') : '';
+      return `<g class="gn ${n.kind}" data-node="${esc(n.id)}" transform="translate(${p.x} ${p.y})" tabindex="0" role="button" aria-label="${esc(n.title)}">
+<rect width="${p.w}" height="${p.h}" rx="${n.kind === 'material' ? 18 : 10}"${n.color && n.kind !== 'project' ? ` style="--c:#${esc(n.color)}"` : ''}/>
+${(n.kind === 'project' ? lines(n.title, p.w - 20) : [lines(n.title, p.w - 20)[0]]).map((l, i, a) => `<text x="12" y="${(sub ? p.h / 2 - 3 : p.h / 2 + 5) - (a.length - 1 - i) * 17}" class="t">${esc(l)}</text>`).join('')}${sub ? `<text x="12" y="${p.h / 2 + 14}" class="s">${esc(sub.slice(0, 44))}</text>` : ''}</g>`; };
+    return `<div class="labmap-scroll"><svg class="labgraph" viewBox="0 0 1000 ${H2}" role="group" aria-label="Graph of ${esc(g.project.title)}">
+<defs><marker id="gar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" class="gah"/></marker></defs>
+<text x="360" y="22" class="col">Runs (oldest first)</text><text x="740" y="22" class="col">Used</text>
+${heads.map((h) => `<text x="740" y="${h.y + 16}" class="col sub">${esc(h.t)}</text>`).join('')}
+${g.edges.map(edge).join('')}${g.nodes.map(node).join('')}</svg></div>
+${g.hidden ? `<p class="labhint">${g.hidden} run(s) of this project are not readable for you.</p>` : ''}`;
+  }
+
+  function showNode(id) {
+    const n = L.graph.nodes.find((x) => x.id === id); if (!n) return;
+    $$('.labgraph .ge').forEach((e) => e.classList.toggle('on', e.dataset.from === id || e.dataset.to === id));
+    $$('.labgraph .gn').forEach((g) => g.classList.toggle('sel', g.dataset.node === id));
+    const box = $('#lab-node'); box.hidden = false;
+    const ins = L.graph.edges.filter((e) => e.to === id).map((e) => L.graph.nodes.find((x) => x.id === e.from)).filter(Boolean);
+    const outs = L.graph.edges.filter((e) => e.from === id).map((e) => L.graph.nodes.find((x) => x.id === e.to)).filter(Boolean);
+    box.innerHTML = `<div class="labrow"><b>${esc(n.title)}</b><span class="labhint">${esc(n.kind === 'run' ? `${n.date} · ${n.who}` : n.category || '')}</span>
+<a class="link" href="${esc(notebookLink(n.entity, n.eid))}" target="_blank" rel="noopener">Open in notebook ↗</a></div>
+${outs.length ? `<p class="labhint">${n.kind === 'run' ? 'Used / next' : 'Has'}: ${outs.map((x) => esc(x.title)).join(', ')}</p>` : ''}
+${ins.length ? `<p class="labhint">${n.kind === 'material' ? 'Used in' : 'From'}: ${ins.map((x) => esc(x.title)).join(', ')}</p>` : ''}`;
+  }
+
   // ---------- events (one delegated listener each, like app.js) ----------
   document.addEventListener('change', (ev) => {
     const t = ev.target;
@@ -746,6 +806,7 @@ ${m.drafts.map((d) => `<details class="labcard"><summary>Prose draft · ${esc(wh
     else if (t.matches('[data-lab-vol]')) { L.choice.volumes[t.dataset.labVol] = t.value; updatePreview(); }
     else if (t.matches('[data-lab-total]')) { L.choice[t.dataset.labTotal] = t.value; updatePreview(); }
     else if (t.matches('[data-lab-tickwho]')) { L.tickWho = t.value; renderTicker(); }
+    else if (t.matches('[data-proj-pick]')) { L.projId = Number(t.value); renderLabGraph(); }
     else if (t.matches('[data-manu-add]') && t.value) {
       const mid = Number(t.value), title = t.selectedOptions[0].textContent; t.value = '';
       api(`manuscripts/${mid}/ticks`, { method: 'POST', body: { add: [Number(t.dataset.manuAdd)] } })
@@ -760,6 +821,8 @@ ${m.drafts.map((d) => `<details class="labcard"><summary>Prose draft · ${esc(wh
   document.addEventListener('input', (ev) => { if (ev.target.closest('[data-lab-form="plan"]') && ev.target.matches('input[type=text],input[type=number],textarea')) updatePreview(); });
 
   document.addEventListener('click', (ev) => {
+    const gn = ev.target.closest('.labgraph [data-node]');
+    if (gn) { showNode(gn.dataset.node); return; }
     const mc = ev.target.closest('[data-manu-open],[data-manu-remove],[data-manu-copy],[data-manu-copydraft],[data-manu-draft]');
     if (mc) { manuClick(mc).catch((err) => toast(err.message)); return; }
     const ak = ev.target.closest('[data-ask-clear],[data-ask-tick]');
@@ -831,6 +894,9 @@ ${m.drafts.map((d) => `<details class="labcard"><summary>Prose draft · ${esc(wh
         const picks = fd.getAll('pick').map((id) => ({ id: Number(id), qty: Number(fd.get('qty_' + id) || 1) }));
         const r = await api('map/stash', { method: 'POST', body: { unit: Number(f.dataset.unit), picks } });
         toast(`Stored ${r.stored.length} run${r.stored.length === 1 ? '' : 's'} here`); renderMap();
+      } else if (kind === 'project') {
+        const r = await api('projects', { method: 'POST', body: { title: fd.get('title') } });
+        L.projId = r.id; L.cat = null; toast('Project added; pick it in the Planner for its runs'); renderLabGraph();
       } else if (kind === 'manu') {
         const r = await api('manuscripts', { method: 'POST', body: { title: fd.get('title') } });
         L.manuId = r.id; L.manus = null; toast('Started. Add ticks from the Ticker with 📄.'); $('#panel-manuscripts').innerHTML = ''; renderManuscripts();

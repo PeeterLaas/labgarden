@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-PAIvik (repo name Labgarden) is a local-first research workspace that runs entirely in the browser: a static site with no build step, no dependencies and no backend. Data is stored in the user's IndexedDB and never leaves the browser. The "gardener" that suggests records and links is plain rule-based JavaScript, not a model, and the page says so. Keep that copy honest: eLabFTW/PAIvik notebook, Carpentries Workbench, protocols.io and model integrations are planned, not implemented here.
+PAIvik (repo name Labgarden) is a local-first research workspace that runs entirely in the browser: a static site with no build step, no dependencies and no backend. By default (and always on the public site) data is stored in the user's IndexedDB and never leaves the browser; the optional lab mode below is the exception, where lab data stays on the lab's own server. The "gardener" that suggests records and links is plain rule-based JavaScript, not a model, and the page says so. Keep that copy honest: outside lab mode, eLabFTW/PAIvik notebook, Carpentries Workbench, protocols.io and model integrations are not part of this page.
 
 The design follows University of Tartu style: signature blue `#2C5696` dominant, deep blue `#1B365D` for the sidebar, Rubik (self-hosted in `dist/fonts/`), grey rather than black text, accents used sparingly. It does not use the official UT logo.
 
