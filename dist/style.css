@@ -353,3 +353,10 @@ body.sem-presenting{overflow:hidden}
 .labask-out{flex-basis:100%;font-size:14px;padding:2px 14px}
 .askfound{border-left:4px solid var(--accent)}.askfound ul{margin:6px 0}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+/* Manuscripts (lab mode) */
+.manucard{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;text-align:left;font:inherit;color:var(--text);cursor:pointer}
+.manucard:hover{border-color:var(--accent)}
+.manuoutline h2,.manuoutline h3,.manudraft h2,.manuoutline h4,.manudraft h3{font-weight:500;margin:14px 0 6px}
+.manuoutline .src{color:var(--accent);font-size:.85em;white-space:nowrap}
+.mdtable{overflow-x:auto}.mdtable table{border-collapse:collapse;font-size:14px}.mdtable th,.mdtable td{border:1px solid var(--line);padding:4px 8px;text-align:left}
+select.manuadd{font:inherit;font-size:13px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--text);padding:2px 4px}

@@ -322,7 +322,7 @@
 
   // ---------- Routing ----------
   // ticker, planner and instruments exist only in lab mode (lab.js); elsewhere they fall back to the graph.
-  const LAB_VIEWS = ['ticker', 'planner', 'seminar', 'map', 'instruments'];
+  const LAB_VIEWS = ['ticker', 'planner', 'seminar', 'manuscripts', 'map', 'instruments'];
   const VIEWS = ['graph', 'inbox', 'review', 'library', 'avatars', 'about', ...LAB_VIEWS];
   const labOn = () => Boolean(window.PAIvikLab && window.PAIvikLab.on);
   const view = () => {

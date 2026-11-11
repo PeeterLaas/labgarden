@@ -18,7 +18,7 @@
     on: false, base: '', me: null, cat: null, error: '',
     choice: { title: '', protocol: '', mix: '', primer_f: '', primer_r: '', instrument: '', positive: '', samples: [], more: '', ntc: true, extra_pct: 13, modification: '', volumes: {}, volume_ul: '', template_ul: '' },
     preview: null, runId: null, run: null, people: null, tickWho: 'me', timers: [],
-    askFound: null, map: null, level: 0, placeKey: null, arranging: false, stashing: false, sem: null, slide: -1,
+    askFound: null, manus: null, manuId: null, map: null, level: 0, placeKey: null, arranging: false, stashing: false, sem: null, slide: -1,
   };
 
   // ---------- talking to the gateway ----------
@@ -159,6 +159,7 @@
     else if (v === 'instruments') renderInstruments();
     else if (v === 'map') renderMap();
     else if (v === 'seminar') renderSeminar();
+    else if (v === 'manuscripts') renderManuscripts();
   }
 
   // ---------- Instruments ----------
@@ -179,6 +180,7 @@ ${r.later.length ? `<p class="labhint">Later today: ${r.later.map((x) => `${esc(
 
   // ---------- Ticker ----------
   async function renderTicker() {
+    if (!L.manus) L.manus = await api('manuscripts').catch(() => []);  // for the 📄 Add to manuscript picker
     const panel = $('#panel-ticker');
     if (!panel.innerHTML) panel.innerHTML = '<p class="labhint">Loading ticks…</p>';
     try {
@@ -211,7 +213,8 @@ ${Object.entries(days).map(([d, ts]) => `<div class="tickday"><span>${esc(new Da
 <span class="labhint"> · ${esc(t.who)}</span>
 ${t.follows.map((x) => `<div class="chain">↳ follows ${esc(x.title)}</div>`).join('')}${t.next.map((x) => `<div class="chain">→ next: ${esc(x.title)}</div>`).join('')}</summary>
 <div class="tickbody"><p><a href="${esc(link)}" target="_blank" rel="noopener">Open in notebook ↗</a>${t.plan_id ? ` · <a href="#planner" data-lab-run="${t.plan_id}">Open run in Planner</a>` : ''}
-${t.mine ? ` · <button type="button" class="link" data-sem-flag="${t.id}" data-on="${t.seminar ? '0' : '1'}">${t.seminar ? 'Take off the seminar' : '⚑ Show at the seminar'}</button>` : ''}</p>
+${t.mine ? ` · <button type="button" class="link" data-sem-flag="${t.id}" data-on="${t.seminar ? '0' : '1'}">${t.seminar ? 'Take off the seminar' : '⚑ Show at the seminar'}</button>` : ''}
+${L.manus && L.manus.length ? ` · <select class="manuadd" data-manu-add="${t.id}" aria-label="Add to a manuscript"><option value="">📄 Add to manuscript…</option>${L.manus.map((m) => `<option value="${m.id}">${esc(m.title)}</option>`).join('')}</select>` : ''}</p>
 ${t.comments.map((c) => `<div class="cm"><b>${esc(c.who)}</b> <span class="labhint">${esc(new Date(c.at).toLocaleString())}</span><br>${esc(c.text)}</div>`).join('')}
 <form data-lab-form="comment" data-exp="${t.id}" class="labrow"><input type="text" name="text" required maxlength="4000" placeholder="Comment…" aria-label="Comment"><button class="link">Comment</button></form>
 ${t.mine ? `<details><summary class="labhint">＋ Attach next tick</summary><form data-lab-form="tick" data-parent="${t.id}" class="labform">
@@ -674,6 +677,64 @@ ${t.notes.map((n) => `<div class="cm semnote"><b>${esc(n.name)}</b>: ${esc(n.tex
     } catch (err) { if (err.code === 'NO_KEY' || err.code === 'SIGN_IN') { out.hidden = true; location.hash = 'ticker'; } else out.textContent = err.message; }
   }
 
+  // ---------- Manuscripts (Manu-Ticker): ticks for a paper -> Materials & Methods outline ----------
+  // A tiny Markdown reader for the outline the gateway compiles (headings, lists, tables, italics). Text is escaped first.
+  function md(src) {
+    const out = []; let list = 0, table = null;
+    const inline = (t) => esc(t).replace(/_([^_]+)_/g, '<em>$1</em>').replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/\[(E\d+)\]/g, '<span class="src">[$1]</span>');
+    const flush = () => { while (list) { out.push('</ul>'); list--; } if (table) { out.push(`<div class="mdtable"><table>${table.join('')}</table></div>`); table = null; } };
+    for (const line of String(src).split('\n')) {
+      const h = line.match(/^(#{1,4})\s+(.*)/), li = line.match(/^(\s*)-\s+(.*)/), row = line.match(/^\|(.*)\|\s*$/);
+      if (row) { if (list) flush(); if (/^\|[\s|:-]+\|$/.test(line)) continue; table = table || []; const cells = row[1].split('|').map((c) => c.trim());
+        table.push(`<tr>${cells.map((c) => `<${table.length ? 'td' : 'th'}>${inline(c)}</${table.length ? 'td' : 'th'}>`).join('')}</tr>`); continue; }
+      if (table) flush();
+      if (h) { flush(); const n = Math.min(h[1].length + 1, 5); out.push(`<h${n}>${inline(h[2])}</h${n}>`); }
+      else if (li) { const depth = li[1].length >= 2 ? 2 : 1; while (list < depth) { out.push('<ul>'); list++; } while (list > depth) { out.push('</ul>'); list--; } out.push(`<li>${inline(li[2])}</li>`); }
+      else if (line.trim()) { flush(); out.push(`<p>${inline(line)}</p>`); }
+      else flush();
+    }
+    flush(); return out.join('');
+  }
+
+  async function renderManuscripts() {
+    const panel = $('#panel-manuscripts');
+    if (!panel.innerHTML) panel.innerHTML = '<p class="labhint">Loading manuscripts…</p>';
+    try {
+      L.manus = await api('manuscripts');
+      if (L.manuId) return drawManuscript(panel, await api('manuscripts/' + L.manuId));
+      panel.innerHTML = `<div class="labcard"><h2>Manuscripts</h2>
+<p class="labhint">Collect ticks for a paper (📄 in the Ticker). PAIvik compiles a Materials &amp; Methods outline from the notebook: every line cites its tick, and gaps (missing supplier, sequence, gel conditions…) are listed. The lab’s own model or Claude can then turn it into prose; nothing is written back.</p>
+<form data-lab-form="manu" class="labrow"><input name="title" required maxlength="300" placeholder="Working title, e.g. Snail gut bacterial communities" aria-label="Manuscript working title"><button class="btn">Start</button></form></div>
+${L.manus.map((m) => `<button type="button" class="labcard manucard" data-manu-open="${m.id}"><b>${esc(m.title)}</b><span class="labhint">${m.ticks} tick${m.ticks === 1 ? '' : 's'} · started by ${esc(m.created_by)}</span></button>`).join('')}`;
+    } catch (err) { problem(panel, err); }
+  }
+
+  function drawManuscript(panel, m) {
+    const o = m.outline;
+    panel.innerHTML = `<p><button type="button" class="link" data-manu-open="0">← All manuscripts</button></p>
+<div class="labcard"><h2>${esc(m.title)}</h2>
+<p class="labhint">${m.ticks.length} tick${m.ticks.length === 1 ? '' : 's'}. Add more from the Ticker (📄 Add to manuscript).${o.hidden.length ? ` ${o.hidden.length} tick(s) are not readable for you and were left out.` : ''}</p>
+<ul class="tight">${m.ticks.map((t) => `<li>[E${t.experiment_id}] ${esc(t.title)} <span class="labhint">added by ${esc(t.added_by)}</span> <button type="button" class="link" data-manu-remove="${t.experiment_id}">remove</button></li>`).join('')}</ul></div>
+<div class="labcard manuoutline"><div class="labrow"><b>Materials &amp; Methods outline</b><button type="button" class="link" data-manu-copy>Copy as Markdown</button>
+<button type="button" class="btn" data-manu-draft ${m.ticks.length ? '' : 'disabled'}>Write prose with the lab’s model</button></div>
+<p class="labhint">Or ask Claude: “use get_manuscript_outline for manuscript ${m.id} and write the Methods”.</p>${md(o.markdown)}</div>
+${m.drafts.map((d) => `<details class="labcard"><summary>Prose draft · ${esc(when(d.created_at))} · ${esc(d.model)}</summary><div class="manudraft">${md(d.text)}</div>
+<button type="button" class="link" data-manu-copydraft="${d.id}">Copy</button></details>`).join('')}`;
+    L.manuDoc = m;
+  }
+
+  async function manuClick(t) {
+    if (t.matches('[data-manu-open]')) { L.manuId = Number(t.dataset.manuOpen) || null; $('#panel-manuscripts').innerHTML = ''; renderManuscripts(); }
+    else if (t.matches('[data-manu-remove]')) { await api(`manuscripts/${L.manuId}/ticks`, { method: 'POST', body: { remove: Number(t.dataset.manuRemove) } }); renderManuscripts(); }
+    else if (t.matches('[data-manu-copy]')) { await navigator.clipboard.writeText(L.manuDoc.outline.markdown); toast('Outline copied'); }
+    else if (t.matches('[data-manu-copydraft]')) { const d = L.manuDoc.drafts.find((x) => x.id === Number(t.dataset.manuCopydraft)); await navigator.clipboard.writeText(d.text); toast('Draft copied'); }
+    else if (t.matches('[data-manu-draft]')) {
+      t.disabled = true; t.textContent = 'Writing… (the lab’s model can take a few minutes)';
+      try { await api(`manuscripts/${L.manuId}/draft`, { method: 'POST', body: {} }); toast('Prose draft ready'); renderManuscripts(); }
+      finally { t.disabled = false; t.textContent = 'Write prose with the lab’s model'; }
+    }
+  }
+
   // ---------- events (one delegated listener each, like app.js) ----------
   document.addEventListener('change', (ev) => {
     const t = ev.target;
@@ -685,6 +746,11 @@ ${t.notes.map((n) => `<div class="cm semnote"><b>${esc(n.name)}</b>: ${esc(n.tex
     else if (t.matches('[data-lab-vol]')) { L.choice.volumes[t.dataset.labVol] = t.value; updatePreview(); }
     else if (t.matches('[data-lab-total]')) { L.choice[t.dataset.labTotal] = t.value; updatePreview(); }
     else if (t.matches('[data-lab-tickwho]')) { L.tickWho = t.value; renderTicker(); }
+    else if (t.matches('[data-manu-add]') && t.value) {
+      const mid = Number(t.value), title = t.selectedOptions[0].textContent; t.value = '';
+      api(`manuscripts/${mid}/ticks`, { method: 'POST', body: { add: [Number(t.dataset.manuAdd)] } })
+        .then((r) => toast(r.added ? `Added to “${title}”` : 'Already in that manuscript')).catch((err) => toast(err.message));
+    }
     else if (t.matches('[data-inst-room]')) {
       const p = L.map.places.find((x) => x.key === t.dataset.instRoom) || { w: 130, h: 84 };
       api('map/layout', { method: 'POST', body: { places: [{ key: t.dataset.instRoom, kind: 'instrument', x: 435, y: 250, w: p.w, h: p.h, level: Number(t.value) }] } })
@@ -694,6 +760,8 @@ ${t.notes.map((n) => `<div class="cm semnote"><b>${esc(n.name)}</b>: ${esc(n.tex
   document.addEventListener('input', (ev) => { if (ev.target.closest('[data-lab-form="plan"]') && ev.target.matches('input[type=text],input[type=number],textarea')) updatePreview(); });
 
   document.addEventListener('click', (ev) => {
+    const mc = ev.target.closest('[data-manu-open],[data-manu-remove],[data-manu-copy],[data-manu-copydraft],[data-manu-draft]');
+    if (mc) { manuClick(mc).catch((err) => toast(err.message)); return; }
     const ak = ev.target.closest('[data-ask-clear],[data-ask-tick]');
     if (ak) {
       if (ak.matches('[data-ask-clear]')) { L.askFound = null; const b = $('.askfound'); if (b) b.remove(); }
@@ -763,6 +831,9 @@ ${t.notes.map((n) => `<div class="cm semnote"><b>${esc(n.name)}</b>: ${esc(n.tex
         const picks = fd.getAll('pick').map((id) => ({ id: Number(id), qty: Number(fd.get('qty_' + id) || 1) }));
         const r = await api('map/stash', { method: 'POST', body: { unit: Number(f.dataset.unit), picks } });
         toast(`Stored ${r.stored.length} run${r.stored.length === 1 ? '' : 's'} here`); renderMap();
+      } else if (kind === 'manu') {
+        const r = await api('manuscripts', { method: 'POST', body: { title: fd.get('title') } });
+        L.manuId = r.id; L.manus = null; toast('Started. Add ticks from the Ticker with 📄.'); $('#panel-manuscripts').innerHTML = ''; renderManuscripts();
       } else if (kind === 'semnote') {
         await api('seminar/note', { method: 'POST', body: { exp: Number(f.dataset.exp), text: fd.get('text') } });
         toast('Remark added; it is in their Ticker now');
