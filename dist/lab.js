@@ -16,9 +16,9 @@
 
   const L = {
     on: false, base: '', me: null, cat: null, error: '',
-    choice: { title: '', project: '', protocol: '', mix: '', primer_f: '', primer_r: '', instrument: '', positive: '', samples: [], more: '', ntc: true, extra_pct: 13, modification: '', volumes: {}, volume_ul: '', template_ul: '' },
+    choice: { title: '', project: '', reference: '', protocol: '', mix: '', primer_f: '', primer_r: '', instrument: '', positive: '', samples: [], more: '', ntc: true, extra_pct: 13, modification: '', volumes: {}, volume_ul: '', template_ul: '' },
     preview: null, runId: null, run: null, people: null, tickWho: 'me', timers: [],
-    askFound: null, manus: null, manuId: null, projId: null, graph: null, map: null, level: 0, placeKey: null, arranging: false, stashing: false, sem: null, slide: -1,
+    refEntry: null, refTimer: null, askFound: null, manus: null, manuId: null, projId: null, graph: null, map: null, level: 0, placeKey: null, arranging: false, stashing: false, sem: null, slide: -1,
   };
 
   // ---------- talking to the gateway ----------
@@ -256,6 +256,7 @@ ${t.mine ? `<details><summary class="labhint">＋ Attach next tick</summary><for
 <div class="labgrid">
 ${(cat.projects || []).length ? `<label>Project <select name="project">${opts(cat.projects, c.project, '— no project —')}</select></label>` : ''}
 <label>Protocol <select name="protocol">${opts(cat.protocols, c.protocol, 'Default PCR recipe')}</select></label>
+<div class="refpick" id="lab-ref">${refHtml()}</div>
 <label>Polymerase / master mix <select name="mix">${opts(cat.mix, c.mix)}</select></label>
 <label>Forward primer <select name="primer_f">${opts(cat.primers, c.primer_f)}</select></label>
 <label>Reverse primer <select name="primer_r">${opts(cat.primers, c.primer_r)}</select></label>
@@ -322,9 +323,34 @@ ${editable ? `<p class="labrow"><label>Reaction <input class="n" type="number" m
 <label>Template <input class="n" type="number" min="0" step="0.5" value="${m.template_ul}" data-lab-total="template_ul"> µL</label></p>` : ''}
 ${mixTable(plan, editable)}
 <p class="labhint">Cycling: ${esc(plan.recipe.cycling || '')}${plan.modification ? ` · <b>This run:</b> ${esc(plan.modification)}` : ''}</p>
+${plan.reference ? `<p class="labhint">📚 Based on: ${esc(plan.reference.paper)}${plan.reference.doi ? ` (DOI ${esc(plan.reference.doi)})` : ''}${plan.reference.has_steps ? '' : ' · cited only: the archive entry has no reviewed steps yet, so the mix above is your own recipe'}</p>` : ''}
 <div class="labgrid"><div><h4>Tubes</h4><ol class="tight">${plan.tubes.map((t) => `<li>${esc(t.label)}</li>`).join('')}</ol></div>
 <div><h4>Gel lanes</h4><ol class="tight">${plan.lanes.map((l) => `<li>${esc(l.label)}</li>`).join('')}</ol></div></div>
 ${editable ? `<div class="labrow"><button type="button" class="btn" data-lab-save>Save run to the notebook</button><span class="labhint">Creates the experiment in your name, linked to ${plan.records.length} records; private until you share it.</span></div>` : ''}`;
+  }
+
+  // ---------- protocol archive: base a run on a published institute method (cited; drafts give no recipe) ----------
+  function refHtml() {
+    const r = L.refEntry;
+    if (r) return `<span class="labhint">Based on a published method</span><div class="refchip"><span>📚 ${esc(r.paper)}${r.year ? ` (${esc(r.year)})` : ''}
+${r.doi ? `<a href="https://doi.org/${encodeURIComponent(r.doi).replace(/%2F/g, '/')}" target="_blank" rel="noopener">DOI ↗</a>` : ''}
+<small class="labhint">${esc(r.archive_id)}${r.has_steps ? '' : ' · draft: cited only, no steps yet'}${r.biosafety ? ' · ⚠ needs biosafety review' : ''}</small></span>
+<button type="button" class="link" data-ref-clear aria-label="Remove the reference">✕</button></div>`;
+    return `<details${L.refOpen ? ' open' : ''} data-ref-details><summary class="labhint">📚 Base it on a published method from the institute’s archive</summary>
+<input type="search" data-ref-q placeholder="Search papers, e.g. snail, 16S, Campylobacter" aria-label="Search the protocol archive" value="${esc(L.refQ || '')}">
+<div id="lab-ref-results" class="refresults"></div></details>`;
+  }
+
+  async function refSearch() {
+    const box = $('#lab-ref-results'); if (!box) return;
+    try {
+      const r = await api('archive?method=PCR&q=' + encodeURIComponent(L.refQ || ''));
+      if (!r.available) { $('#lab-ref').hidden = true; return; }
+      L.refResults = r.results;
+      box.innerHTML = `<p class="labhint">${r.total} PCR method${r.total === 1 ? '' : 's'} from institute papers${r.total > r.results.length ? `, first ${r.results.length} shown` : ''}. Drafts are cited, not copied: they have no reviewed steps yet.</p>
+${r.results.map((x) => `<button type="button" class="refrow" data-ref-pick="${esc(x.archive_id)}"><span>${esc(x.paper)}</span>
+<small class="labhint">${esc(x.authors.split(',')[0] || '')}${x.authors.includes(',') ? ' et al.' : ''}${x.year ? ` ${esc(x.year)}` : ''}${x.licence ? ` · ${esc(x.licence)}` : ''}${x.biosafety ? ' · ⚠ biosafety review' : ''}</small></button>`).join('')}`;
+    } catch (err) { box.innerHTML = `<p class="labhint">${esc(err.message)}</p>`; }
   }
 
   async function saveRun(btn) {
@@ -337,7 +363,7 @@ ${editable ? `<div class="labrow"><button type="button" class="btn" data-lab-sav
       const changed = JSON.stringify([draft.plan.mix, draft.plan.tubes]) !== shown;
       const saved = await api(`plans/${draft.id}/save`, { method: 'POST', body: { hash: draft.hash } });
       toast(changed ? 'Saved. The records had changed, so the numbers were updated: check the run page.' : 'Saved to the notebook');
-      L.choice.samples = []; L.choice.title = ''; L.choice.more = ''; L.askFound = null;
+      L.choice.samples = []; L.choice.title = ''; L.choice.more = ''; L.askFound = null; L.choice.reference = ''; L.refEntry = null;
       openRun(saved.id);
     } catch (err) { toast(err.message); } finally { btn.disabled = false; btn.textContent = 'Save run to the notebook'; }
   }
@@ -818,11 +844,23 @@ ${ins.length ? `<p class="labhint">${n.kind === 'material' ? 'Used in' : 'From'}
         .then(() => { toast('Moved'); L.placeKey = null; renderMap(); }).catch((err) => toast(err.message));
     }
   });
-  document.addEventListener('input', (ev) => { if (ev.target.closest('[data-lab-form="plan"]') && ev.target.matches('input[type=text],input[type=number],textarea')) updatePreview(); });
+  document.addEventListener('input', (ev) => {
+    if (ev.target.matches('[data-ref-q]')) { L.refQ = ev.target.value; clearTimeout(L.refTimer); L.refTimer = setTimeout(refSearch, 300); return; }
+    if (ev.target.closest('[data-lab-form="plan"]') && ev.target.matches('input[type=text],input[type=number],textarea')) updatePreview();
+  });
+  document.addEventListener('toggle', (ev) => {
+    if (ev.target.matches && ev.target.matches('[data-ref-details]')) { L.refOpen = ev.target.open; if (ev.target.open) refSearch(); }
+  }, true);
 
   document.addEventListener('click', (ev) => {
     const gn = ev.target.closest('.labgraph [data-node]');
     if (gn) { showNode(gn.dataset.node); return; }
+    const rf = ev.target.closest('[data-ref-pick],[data-ref-clear]');
+    if (rf) {
+      if (rf.matches('[data-ref-pick]')) { L.refEntry = (L.refResults || []).find((x) => x.archive_id === rf.dataset.refPick) || null; L.choice.reference = rf.dataset.refPick; }
+      else { L.refEntry = null; L.choice.reference = ''; }
+      $('#lab-ref').innerHTML = refHtml(); updatePreview(); return;
+    }
     const mc = ev.target.closest('[data-manu-open],[data-manu-remove],[data-manu-copy],[data-manu-copydraft],[data-manu-draft]');
     if (mc) { manuClick(mc).catch((err) => toast(err.message)); return; }
     const ak = ev.target.closest('[data-ask-clear],[data-ask-tick]');
