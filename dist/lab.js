@@ -19,6 +19,7 @@
     choice: { title: '', project: '', reference: '', protocol: '', mix: '', primer_f: '', primer_r: '', instrument: '', positive: '', samples: [], more: '', ntc: true, extra_pct: 13, modification: '', volumes: {}, volume_ul: '', template_ul: '' },
     preview: null, runId: null, run: null, people: null, tickWho: 'me', timers: [],
     refEntry: null, refTimer: null, askFound: null, manus: null, manuId: null, projId: null, graph: null, map: null, level: 0, placeKey: null, arranging: false, stashing: false, sem: null, slide: -1,
+    fb: null, fbId: null, fbFilter: 'open', fbFrom: '', fbPic: null,
   };
 
   // ---------- talking to the gateway ----------
@@ -118,6 +119,12 @@
  <a href="${esc(p.review_url)}" target="_blank" rel="noopener">Open the review page ↗</a> <span class="labhint">(your own changes are written at once; ones drafted by a model wait there for an approver)</span>`;
       }
     } catch { /* badges are a convenience */ }
+    try {
+      const f = await api('feedback?status=open');
+      const n = f.maintainer ? (f.counts.new || 0) : f.items.filter((x) => x.answered).length;
+      $('#count-feedback').textContent = n || '';
+      $('#count-feedback').title = f.maintainer ? 'New reports' : 'Answers waiting for you';
+    } catch { /* ignore */ }
     if (!L.me.has_key) return;
     try {
       const m = await api('map');  // one call: instruments in use and open notes on the lab map
@@ -161,6 +168,8 @@
     else if (v === 'seminar') renderSeminar();
     else if (v === 'manuscripts') renderManuscripts();
     else if (v === 'labgraph') renderLabGraph();
+    else if (v === 'feedback') renderFeedback();
+    if (v !== 'feedback') L.fbFrom = v;  // where the person was, for the next report
   }
 
   // ---------- Instruments ----------
@@ -765,6 +774,77 @@ ${m.drafts.map((d) => `<details class="labcard"><summary>Prose draft · ${esc(wh
     }
   }
 
+  // ---------- Feedback: bugs, ideas and questions about PAIvik itself ----------
+  const FB_KIND = { bug: '🐞 Bug', idea: '💡 Idea', question: '❓ Question', note: '📝 Note' };
+  const FB_STATUS = { new: 'New', planned: 'Planned', needs_info: 'Waiting for reporter', fixed: 'Fixed', wontfix: 'Won’t fix', duplicate: 'Duplicate' };
+  const VIEW_NAMES = { graph: 'Graph', inbox: 'Inbox', review: 'Review changes', library: 'Library', labgraph: 'Lab projects', ticker: 'Ticker', planner: 'Planner', seminar: 'Seminar', manuscripts: 'Manuscripts', map: 'Lab map', instruments: 'Instruments', about: 'About' };
+
+  async function renderFeedback() {
+    const panel = $('#panel-feedback');
+    if (!panel.innerHTML) panel.innerHTML = '<p class="labhint">Loading feedback…</p>';
+    try {
+      if (L.fbId) return drawReport(panel, await api('feedback/' + L.fbId));
+      L.fb = await api('feedback' + (L.fbFilter === 'open' ? '?status=open' : ''));
+      const from = VIEW_NAMES[L.fbFrom] || '';
+      const items = L.fb.items;
+      panel.innerHTML = `<div class="labcard"><h2>Feedback about PAIvik</h2>
+<p class="labhint">Something broken, confusing or missing? Say it here, in your own words: it goes straight to the people who build PAIvik and stays on the lab server. You can also ask your Claude to report it.</p>
+<form data-lab-form="feedback" class="fbform">
+<div class="fbkinds" role="radiogroup" aria-label="Kind">${Object.entries(FB_KIND).map(([k, v], i) => `<label><input type="radio" name="kind" value="${k}" ${i ? '' : 'checked'}> ${v}</label>`).join('')}</div>
+<input name="title" maxlength="160" required placeholder="In one line: what happened or what you need" aria-label="Title">
+<textarea name="text" rows="4" maxlength="8000" placeholder="Details: what you did, what you expected, what happened instead. Paste a screenshot here (Ctrl+V) or attach one." aria-label="Details"></textarea>
+<div class="labrow"><label class="labhint">Where: <input name="place" maxlength="200" value="${esc(from)}" placeholder="e.g. Planner" aria-label="Where in PAIvik"></label>
+<label class="labhint">Screenshot: <input type="file" name="picture" accept="image/png,image/jpeg,image/webp" data-fb-file></label><span class="labhint" id="fb-pasted"></span>
+<button class="btn">Send</button></div></form></div>
+<div class="labrow fbfilter"><b>${L.fb.maintainer ? 'All reports' : 'Your reports'}</b>
+<label class="labhint"><input type="radio" name="fbfilter" value="open" data-fb-filter ${L.fbFilter === 'open' ? 'checked' : ''}> open</label>
+<label class="labhint"><input type="radio" name="fbfilter" value="all" data-fb-filter ${L.fbFilter === 'all' ? 'checked' : ''}> all</label>
+<span class="labhint">${Object.entries(L.fb.counts).map(([k, n]) => `${esc(FB_STATUS[k] || k)} ${n}`).join(' · ')}</span></div>
+${items.length ? items.map(reportCard).join('') : `<p class="labhint">${L.fbFilter === 'open' ? 'Nothing open.' : 'No reports yet.'}</p>`}`;
+    } catch (err) { problem(panel, err); }
+  }
+
+  function reportCard(x) {
+    const flag = L.fb.maintainer ? x.status === 'new' : x.answered;
+    return `<button type="button" class="labcard manucard fbcard${flag ? ' fbflag' : ''}" data-fb-open="${x.id}">
+<span><span class="chip">${FB_KIND[x.kind] || esc(x.kind)}</span> <span class="fbstatus fb-${esc(x.status)}">${esc(FB_STATUS[x.status] || x.status)}</span> <b>#${x.id} ${esc(x.title)}</b></span>
+<span class="labhint">${esc(x.name)} · ${esc(when(x.at))}${x.place ? ' · ' + esc(x.place) : ''}${x.events ? ` · ${x.events} repl${x.events === 1 ? 'y' : 'ies'}` : ''}${x.answered && !L.fb.maintainer ? ' · <b>answered, your turn</b>' : ''}${x.fixed_in ? ' · fixed in ' + esc(x.fixed_in) : ''}</span></button>`;
+  }
+
+  function drawReport(panel, x) {
+    const statusForm = x.maintainer ? `<label class="labhint">Status <select name="status" aria-label="Status"><option value="">(keep: ${esc(FB_STATUS[x.status])})</option>${Object.entries(FB_STATUS).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('')}</select></label>
+<label class="labhint">Fixed in <input name="fixed_in" maxlength="200" value="${esc(x.fixed_in)}" placeholder="commit / PR"></label>` : '';
+    panel.innerHTML = `<p><button type="button" class="link" data-fb-open="0">← All feedback</button></p>
+<div class="labcard"><p><span class="chip">${FB_KIND[x.kind] || esc(x.kind)}</span> <span class="fbstatus fb-${esc(x.status)}">${esc(FB_STATUS[x.status] || x.status)}</span>${x.fixed_in ? ` <span class="labhint">fixed in ${esc(x.fixed_in)}</span>` : ''}</p>
+<h2>#${x.id} ${esc(x.title)}</h2>
+<p class="labhint">${esc(x.name)} · ${esc(when(x.at))}${x.place ? ' · ' + esc(x.place) : ''} · via ${esc(x.context.source || 'web')}${x.context.view ? ' · view ' + esc(x.context.view) : ''}${x.context.screen ? ' · ' + esc(x.context.screen) : ''}</p>
+${x.text ? `<div class="fbtext">${esc(x.text)}</div>` : ''}
+${x.has_picture ? `<p><a href="${esc(L.base)}api/v1/feedback/${x.id}/picture" target="_blank" rel="noopener"><img class="fbpic" src="${esc(L.base)}api/v1/feedback/${x.id}/picture" alt="Screenshot for report ${x.id}"></a></p>` : ''}</div>
+${x.thread.map((e) => `<div class="labcard fbreply${e.who === (L.me && L.me.user || '').toLowerCase() ? ' mine' : ''}"><p class="labhint"><b>${esc(e.name)}</b> · ${esc(when(e.at))}${e.status ? ` · <span class="fbstatus fb-${esc(e.status)}">${esc(FB_STATUS[e.status] || e.status)}</span>` : ''}</p>${e.text ? `<div class="fbtext">${esc(e.text)}</div>` : ''}</div>`).join('')}
+<form class="labcard fbform" data-lab-form="fbreply" data-fid="${x.id}"><textarea name="text" rows="3" maxlength="8000" placeholder="${x.maintainer ? 'Answer the reporter' : 'Add details or answer a question'}" aria-label="Reply"></textarea>
+<div class="labrow">${statusForm}<button class="btn">${x.maintainer ? 'Save' : 'Send'}</button></div>
+${x.maintainer ? `<p class="labhint">Or let Claude work through the inbox: “use feedback_inbox and fix what you can”.</p>` : ''}</form>`;
+  }
+
+  async function fbClick(t) {
+    if (t.matches('[data-fb-open]')) { L.fbId = Number(t.dataset.fbOpen) || null; $('#panel-feedback').innerHTML = ''; renderFeedback(); }
+    else if (t.matches('#lab-report')) {
+      L.fbId = null;
+      if (currentView() !== 'feedback') location.hash = 'feedback'; else renderFeedback();
+      setTimeout(() => { const i = $('[data-lab-form="feedback"] [name=title]'); if (i) i.focus(); }, 400);
+    }
+  }
+
+  // a screenshot pasted into the details box is attached to the report
+  document.addEventListener('paste', (ev) => {
+    if (!ev.target.closest || !ev.target.closest('[data-lab-form="feedback"]')) return;
+    const file = [...(ev.clipboardData && ev.clipboardData.files || [])].find((f) => /^image\/(png|jpeg|webp)$/.test(f.type));
+    if (!file) return;
+    ev.preventDefault();
+    L.fbPic = file;
+    const s = $('#fb-pasted'); if (s) s.textContent = `✓ screenshot pasted (${Math.round(file.size / 1024)} KB)`;
+  });
+
   // ---------- Lab projects: the project graph from notebook links ----------
   async function renderLabGraph() {
     const panel = $('#panel-labgraph');
@@ -832,6 +912,8 @@ ${ins.length ? `<p class="labhint">${n.kind === 'material' ? 'Used in' : 'From'}
     else if (t.matches('[data-lab-vol]')) { L.choice.volumes[t.dataset.labVol] = t.value; updatePreview(); }
     else if (t.matches('[data-lab-total]')) { L.choice[t.dataset.labTotal] = t.value; updatePreview(); }
     else if (t.matches('[data-lab-tickwho]')) { L.tickWho = t.value; renderTicker(); }
+    else if (t.matches('[data-fb-filter]')) { L.fbFilter = t.value; renderFeedback(); }
+    else if (t.matches('[data-fb-file]')) { L.fbPic = t.files[0] || null; const s = $('#fb-pasted'); if (s) s.textContent = ''; }
     else if (t.matches('[data-proj-pick]')) { L.projId = Number(t.value); renderLabGraph(); }
     else if (t.matches('[data-manu-add]') && t.value) {
       const mid = Number(t.value), title = t.selectedOptions[0].textContent; t.value = '';
@@ -861,6 +943,8 @@ ${ins.length ? `<p class="labhint">${n.kind === 'material' ? 'Used in' : 'From'}
       else { L.refEntry = null; L.choice.reference = ''; }
       $('#lab-ref').innerHTML = refHtml(); updatePreview(); return;
     }
+    const fbt = ev.target.closest('[data-fb-open],#lab-report');
+    if (fbt) { fbClick(fbt).catch((err) => toast(err.message)); return; }
     const mc = ev.target.closest('[data-manu-open],[data-manu-remove],[data-manu-copy],[data-manu-copydraft],[data-manu-draft]');
     if (mc) { manuClick(mc).catch((err) => toast(err.message)); return; }
     const ak = ev.target.closest('[data-ask-clear],[data-ask-tick]');
@@ -944,6 +1028,18 @@ ${ins.length ? `<p class="labhint">${n.kind === 'material' ? 'Used in' : 'From'}
         if (f.dataset.present) { const i = L.slide; L.sem = await api('seminar'); present(i); f.reset(); } else renderSeminar();
       } else if (kind === 'semday') {
         await api('seminar/day', { method: 'POST', body: { day: fd.get('day') } }); toast('Seminar moved'); renderSeminar();
+      } else if (kind === 'feedback') {
+        const r = await api('feedback', { method: 'POST', body: { kind: fd.get('kind'), title: fd.get('title'), text: fd.get('text'), place: fd.get('place'),
+          context: { source: 'web', view: L.fbFrom || '', screen: `${innerWidth}×${innerHeight}`, browser: navigator.userAgent.slice(0, 200) } } });
+        if (L.fbPic) {
+          const up = new FormData(); up.append('picture', L.fbPic, L.fbPic.name || 'screenshot.png');
+          try { await api(`feedback/${r.id}/picture`, { method: 'POST', form: up }); } catch (err) { toast('Report sent, but the screenshot was not: ' + err.message); }
+          L.fbPic = null;
+        }
+        toast(`Thanks! Report #${r.id} sent`); f.reset(); $('#panel-feedback').innerHTML = ''; renderFeedback(); refreshBadges();
+      } else if (kind === 'fbreply') {
+        await api(`feedback/${f.dataset.fid}/reply`, { method: 'POST', body: { text: fd.get('text'), status: fd.get('status') || '', fixed_in: fd.get('fixed_in') || '' } });
+        toast('Saved'); renderFeedback(); refreshBadges();
       } else if (kind === 'share') {
         L.run = await api(`plans/${L.runId}/share`, { method: 'POST', body: { mode: fd.get('mode'), users: fd.getAll('user') } });
         toast('Shared'); renderPlanner();
