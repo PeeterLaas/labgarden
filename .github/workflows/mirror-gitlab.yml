@@ -1,0 +1,46 @@
+name: Mirror main to UT GitLab
+# After every change on main, push main (and tags) to the lab's GitLab copy so members there stay current.
+# Never forces: if the GitLab copy has commits GitHub lacks (e.g. a merge request merged there), the run
+# stops and says so, instead of overwriting someone's work.
+#
+# Needs, in this repository's Settings → Secrets and variables → Actions:
+#   variable GITLAB_MIRROR_URL  https URL of the GitLab project (…/labgarden.git)
+#   secret   GITLAB_TOKEN       GitLab project access token: role Maintainer, scope write_repository
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: mirror-gitlab
+  cancel-in-progress: false
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    if: ${{ vars.GITLAB_MIRROR_URL != '' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Push main to GitLab (fast-forward only)
+        env:
+          URL: ${{ vars.GITLAB_MIRROR_URL }}
+          TOKEN: ${{ secrets.GITLAB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "$TOKEN" ]; then echo "::error::Secret GITLAB_TOKEN is not set"; exit 1; fi
+          case "$URL" in https://*) ;; *) echo "::error::GITLAB_MIRROR_URL must be an https URL"; exit 1;; esac
+          AUTH=$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)
+          echo "::add-mask::$AUTH"
+          git() { command git -c http.extraHeader="Authorization: Basic $AUTH" "$@"; }
+          git fetch --quiet "$URL" main:refs/remotes/gitlab/main || true
+          if git rev-parse --verify --quiet refs/remotes/gitlab/main >/dev/null \
+             && ! git merge-base --is-ancestor refs/remotes/gitlab/main HEAD; then
+            echo "::error::GitLab main has commits that GitHub main does not. Merge them into GitHub first (git fetch gitlab && git merge gitlab/main, then a PR), and merge only on GitHub from then on."
+            git log --oneline HEAD..refs/remotes/gitlab/main
+            exit 1
+          fi
+          git push "$URL" HEAD:refs/heads/main
+          git push "$URL" --tags
