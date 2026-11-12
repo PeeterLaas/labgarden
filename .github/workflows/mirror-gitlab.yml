@@ -18,7 +18,7 @@ concurrency:
 jobs:
   mirror:
     runs-on: ubuntu-latest
-    if: ${{ vars.GITLAB_MIRROR_URL != '' }}
+    if: ${{ vars.GITLAB_MIRROR_URL != '' && github.ref == 'refs/heads/main' }}
     steps:
       - uses: actions/checkout@v4
         with:
