@@ -27,6 +27,7 @@
       <a href="#manuscripts" data-nav="manuscripts" data-lab hidden><span class="ico" aria-hidden="true">¶</span> Manuscripts</a>
       <a href="#seminar" data-nav="seminar" data-lab hidden><span class="ico" aria-hidden="true">◎</span> Seminar</a>
       <a href="#map" data-nav="map" data-lab hidden><span class="ico" aria-hidden="true">▦</span> Lab map <b id="count-map" class="labcount"></b></a>
+      <a href="#feedback" data-nav="feedback" data-lab hidden><span class="ico" aria-hidden="true">✎</span> Feedback <b id="count-feedback" class="labcount"></b></a>
       <a href="#inbox" data-nav="inbox"><span class="ico" aria-hidden="true">⌑</span> Capture inbox <b id="count-inbox">0</b></a>
       <a href="#review" data-nav="review"><span class="ico" aria-hidden="true">✓</span> Review changes <b id="count-review">0</b><b id="count-lab-review" class="labcount" data-lab hidden title="Lab notebook proposals waiting"></b></a>
       <a href="#library" data-nav="library"><span class="ico" aria-hidden="true">▤</span> Resources & protocols</a>
@@ -56,6 +57,7 @@
     <header class="topbar">
       <p class="crumbs">Projects / <b id="crumb-project">—</b></p>
       <button type="button" class="labtimer" id="lab-timer" hidden></button>
+      <button type="button" class="labtimer labreport" id="lab-report" data-lab hidden title="Report a bug, an idea or a question about PAIvik">✎ Feedback</button>
       <a class="labtimer labprint" id="lab-print" data-lab hidden target="_blank" rel="noopener" href="#" title="Print today's ticks for the paper notebook">🖨 Print today</a>
       <p class="privacy">Private · nothing leaves this browser</p>
     </header>
@@ -107,6 +109,7 @@
       <div class="panel lab" id="panel-seminar" hidden></div>
       <div class="panel lab" id="panel-manuscripts" hidden></div>
       <div class="panel lab" id="panel-labgraph" hidden></div>
+      <div class="panel lab" id="panel-feedback" hidden></div>
 
       <div class="panel" id="panel-review" hidden>
         <p class="labcard" id="lab-review-note" hidden></p>

@@ -381,3 +381,27 @@ select.manuadd{font:inherit;font-size:13px;border:1px solid var(--line);border-r
 .refrow:hover,.refrow:focus-visible{border-color:var(--accent)}
 .refchip{display:flex;gap:8px;align-items:flex-start;justify-content:space-between;border:1px solid var(--accent);border-radius:8px;padding:6px 10px;background:var(--accent-tint)}
 .refchip small{display:block}
+
+/* Lab mode: feedback about PAIvik */
+.labreport{background:var(--surface);margin-right:8px}
+.labtimer:not([hidden]) + .labreport{margin-left:0}
+.fbform{display:flex;flex-direction:column;gap:10px}
+.fbform input[type=text],.fbform input:not([type]),.fbform textarea,.fbform select{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text)}
+.fbform textarea{resize:vertical;min-height:80px}
+.fbkinds{display:flex;flex-wrap:wrap;gap:8px}
+.fbkinds label{border:1px solid var(--line);border-radius:99px;padding:4px 12px;cursor:pointer}
+.fbkinds label:has(input:checked){border-color:var(--accent);background:var(--accent-tint);color:var(--accent)}
+.fbkinds input{position:absolute;opacity:0;pointer-events:none}
+.fbkinds label:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+.fbfilter{margin:14px 0 8px;gap:14px;flex-wrap:wrap}
+.fbcard.fbflag{border-left:4px solid var(--accent)}
+.fbstatus{font-size:12px;padding:1px 8px;border-radius:99px;background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
+.fb-new{color:var(--accent);border-color:var(--accent)}
+.fb-needs_info{color:#8a5a00;border-color:#d4a23a;background:#fff6e0}
+.fb-fixed{color:var(--ok);border-color:var(--ok)}
+.fb-wontfix,.fb-duplicate{text-decoration:line-through}
+.fbtext{white-space:pre-wrap;overflow-wrap:anywhere}
+.fbpic{max-width:100%;max-height:420px;border:1px solid var(--line);border-radius:8px}
+.fbreply.mine{border-left:4px solid var(--rec-stroke)}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .fb-needs_info{color:#f3c96b;background:#3a2f12;border-color:#8a6a1c} }
+@media (max-width:860px){ .labreport{padding:3px 8px} }
