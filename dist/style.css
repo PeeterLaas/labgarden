@@ -405,3 +405,12 @@ select.manuadd{font:inherit;font-size:13px;border:1px solid var(--line);border-r
 .fbreply.mine{border-left:4px solid var(--rec-stroke)}
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .fb-needs_info{color:#f3c96b;background:#3a2f12;border-color:#8a6a1c} }
 @media (max-width:860px){ .labreport{padding:3px 8px} }
+
+/* Lab mode: Planner protocol chooser */
+.protogrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;margin:8px 0 14px}
+.protocard{display:flex;flex-direction:column;align-items:flex-start;gap:4px;text-align:left;font:inherit;color:var(--text);cursor:pointer;margin:0}
+.protocard:hover,.protocard:focus-visible{border-color:var(--accent)}
+.protocard .chip{font-size:11px}
+[data-proto-q],[data-pio-q]{width:100%;font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text);margin:4px 0}
+.refrow.pio{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.refrow.pio span{display:flex;flex-direction:column}
