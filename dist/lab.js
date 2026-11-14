@@ -439,6 +439,12 @@ ${p.mine ? '<div class="labrow"><input type="text" name="note" maxlength="500" p
 
   // ---------- Lab map: fridges, freezers, instruments; notes; today's products ----------
   const ICON = { freezer80: '❄❄', freezer: '❄', fridge: '▯', cabinet: '▦', shelf: '▤', bench: '▭', instrument: '⚙', storage: '▢', room: '⌂' };
+  // Live freezer states come from tartuvaim (through the gateway); the map only shows what tartuvaim decided.
+  const LIVE = { ok: 'OK', alarm: 'Too warm', silent: 'Sensor silent', stale: 'Not watched', waiting: 'Waiting for a reading' };
+  const SHORT = { ok: 'OK', alarm: 'too warm', silent: 'silent', stale: 'not watched', waiting: 'waiting…' };  // fits inside a box
+  const minus = (v) => String(v).replace('-', '−');
+  const temp = (lv) => (lv && lv.value !== null && lv.value !== undefined ? `${minus(Number(lv.value).toFixed(1))} ${lv.unit || ''}`.trim() : '');
+  const liveWords = (lv) => (lv.summary ? `${LIVE[lv.state] || lv.state} inside` : [LIVE[lv.state] || lv.state, temp(lv)].filter(Boolean).join(', '));
   // Names wrap onto two lines inside the box; longer ones end in an ellipsis (the full name is in the side panel).
   function lines(t, w) {
     const max = Math.max(5, Math.floor(w / 8.6)), words = String(t).split(/\s+/), out = [''];
@@ -453,6 +459,12 @@ ${p.mine ? '<div class="labrow"><input type="text" name="note" maxlength="500" p
 
   async function renderMap() {
     const panel = $('#panel-map');
+    if (!L.mapTimer) {
+      L.mapTimer = setInterval(() => {  // live freezer colours: refresh unless the person is arranging or typing
+        const typing = document.activeElement && document.activeElement.closest && document.activeElement.closest('#panel-map input, #panel-map textarea, #panel-map select');
+        if (location.hash === '#map' && !L.arranging && !typing && !document.hidden) renderMap();
+      }, 30000);
+    }
     if (!panel.innerHTML) panel.innerHTML = '<p class="labhint">Loading the lab map…</p>';
     try {
       L.map = await api('map?level=' + L.level);
@@ -468,15 +480,17 @@ ${p.mine ? '<div class="labrow"><input type="text" name="note" maxlength="500" p
     const kinds = Object.entries(m.kinds).filter(([k]) => k !== 'instrument').map(([k, v]) => `<option value="${esc(k)}">${esc(v)}</option>`).join('');
     const pic = m.picture ? `<image class="plan" href="${esc(L.base)}api/v1/map/picture?level=${m.level}&v=${encodeURIComponent(m.picture.at)}" x="0" y="0" width="${m.w}" height="${m.h}" preserveAspectRatio="none"/>` : '';
     const box = (p) => {
-      const st = p.state ? ` ${p.state.replace(' ', '-')}` : '';
-      const badges = [p.count ? `${p.count}` : '', p.notes ? `💬${p.notes}` : ''].filter(Boolean).join(' ');
+      const st = (p.state ? ` ${p.state.replace(' ', '-')}` : '') + (p.live ? ` live-${p.live.state}` : '');
+      const warn = p.live && p.live.summary && p.live.state !== 'ok' ? `⚠ ${p.live.count}` : '';
+      const badges = [warn, p.count ? `${p.count}` : '', p.notes ? `💬${p.notes}` : ''].filter(Boolean).join(' ');
+      const lvText = p.live && !p.live.summary ? (temp(p.live) || SHORT[p.live.state] || '') : '';
       const isRoom = p.kind === 'room';
       const label = lines(p.name, p.w - 16);
       return `<g class="place ${esc(p.kind)}${st}${p.key === L.placeKey ? ' sel' : ''}" data-place="${esc(p.key)}" transform="translate(${p.x} ${p.y})" tabindex="0" role="button"
- aria-label="${esc(p.name)}${isRoom ? ' (room, opens its plan)' : ''}${p.count ? `, ${p.count} stored` : ''}${p.notes ? `, ${p.notes} notes` : ''}${p.state ? `, ${esc(p.state)}` : ''}">
+ aria-label="${esc(p.name)}${isRoom ? ' (room, opens its plan)' : ''}${p.count ? `, ${p.count} stored` : ''}${p.notes ? `, ${p.notes} notes` : ''}${p.state ? `, ${esc(p.state)}` : ''}${p.live ? `, ${esc(liveWords(p.live))}` : ''}">
 <rect width="${p.w}" height="${p.h}" rx="${isRoom ? 4 : 10}"/>${isRoom
   ? label.map((l, i) => `<text x="8" y="${20 + i * 17}" class="nm">${esc(l)}</text>`).join('')
-  : `<text x="10" y="28" class="ico">${ICON[p.kind] || '▢'}</text>${label.map((l, i, a) => `<text x="10" y="${p.h - 12 - (a.length - 1 - i) * 18}" class="nm">${esc(l)}</text>`).join('')}`}
+  : `<text x="10" y="28" class="ico">${ICON[p.kind] || '▢'}</text>${lvText ? `<text x="${p.kind === 'freezer80' ? 46 : 36}" y="27" class="lv">${esc(lvText)}</text>` : ''}${label.map((l, i, a) => `<text x="10" y="${p.h - 12 - (a.length - 1 - i) * 18}" class="nm">${esc(l)}</text>`).join('')}`}
 ${badges ? `<text x="${p.w - 8}" y="${isRoom ? p.h - 10 : 26}" class="bd" text-anchor="end">${esc(badges)}</text>` : ''}
 ${L.arranging ? `<rect class="grip" data-grip width="16" height="16" x="${p.w - 16}" y="${p.h - 16}" rx="3"/>` : ''}</g>`;
     };
@@ -529,12 +543,17 @@ ${L.map.rooms.length ? `<p class="labrow"><label class="labhint">Stands in <sele
 ${notesHtml(pl)}`;
       return;
     }
+    const lv = (L.map.places.find((p) => p.key === pl.key) || {}).live;
+    const liveHtml = lv && !lv.summary ? `<p class="labrow"><span class="chip live-${esc(lv.state)}">${esc(LIVE[lv.state] || lv.state)}</span>${temp(lv) ? ` <b>${esc(temp(lv))}</b>` : ''}
+${lv.min !== null && lv.max !== null && lv.min !== undefined ? ` <span class="labhint">allowed ${esc(minus(lv.min))} … ${esc(minus(lv.max))} ${esc(lv.unit || '')}</span>` : ''}
+${lv.at ? ` <span class="labhint">· reading ${esc(when(lv.at))}</span>` : ''}</p>
+${lv.state === 'stale' ? '<p class="labhint">tartuvaim has not reported for a while: this freezer is not being watched right now.</p>' : ''}` : '';
     const rows = pl.sections.map((s) => `<div class="psec" style="--d:${s.depth}"><p class="labhint">${s.depth ? '└ ' : ''}${esc(s.name)}</p>
 ${s.items.map((it) => `<div class="labrow prow"><a href="${esc(notebookLink(it.entity, it.id))}" target="_blank" rel="noopener">${it.entity === 'experiments' ? '⚗ ' : ''}${esc(it.title)}</a>
 <span class="labhint">${esc(num(it.qty))}${it.unit && it.unit !== '•' ? ' ' + esc(it.unit) : ''} · ${esc(it.who)}</span>
 <button type="button" class="link" data-takeout="${esc(it.entity)}:${it.id}:${it.container}" title="Used up, thrown away or moved">Take out</button></div>`).join('')}</div>`).join('');
     const count = pl.sections.reduce((n, s) => n + s.items.length, 0);
-    side.innerHTML = `${head}
+    side.innerHTML = `${head}${liveHtml}
 <button type="button" class="btn big" data-stash="${pl.id}">⬇ Put today’s products here</button><div id="lab-stash"></div>
 <h4>Inside (${count})</h4>${count ? rows : `${rows}<p class="labhint">Empty, as far as the notebook knows.</p>`}
 <form data-lab-form="shelf" class="labrow"><input name="name" required maxlength="100" placeholder="＋ Shelf or box inside" aria-label="New shelf or box">
