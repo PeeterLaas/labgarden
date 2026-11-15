@@ -548,15 +548,47 @@ ${r.results.map((x) => `<button type="button" class="refrow" data-ref-pick="${es
           ? `<div class="labcard"><h3>${running ? 'Running' : 'Run finished'} on ${esc(ins ? ins.title : 'the instrument')}</h3><p class="bigclock" data-lab-clock="${esc(p.booking_end)}"></p><p class="labhint">Others see the instrument as busy until then.</p></div>`
           : `<form class="labcard labrow" data-lab-form="start"><b>Start the run</b><label>Run time <input class="n" type="number" name="minutes" min="1" max="1440" value="${esc(plan.kind === 'protocol' ? plan.run_minutes || 60 : plan.recipe.run_minutes || 90)}"> min</label>
 <button class="btn"${ins ? '' : ' disabled'}>▶ Start timer${ins ? ' and book ' + esc(ins.title) : ''}</button>${ins ? '' : `<span class="labhint">No ${plan.kind === 'protocol' ? 'instrument' : 'thermocycler'} was chosen for this run.</span>`}</form>`;
-        act += benchHtml(p) + (plan.kind === 'protocol' ? '' : gelHtml(p)) + shareHtml(p);
+        act += benchHtml(p) + '<div id="lab-balance"></div>' + (plan.kind === 'protocol' ? '' : gelHtml(p)) + shareHtml(p);
       } else if (p.gel_upload) act += gelHtml(p);
       panel.innerHTML = `<p><a href="#planner" data-lab-back>← Planner</a></p><div class="labcard"><h2>${esc(plan.title)}</h2>
 <p class="labhint">${esc(p.created_by)} · ${esc(p.status)}${exp ? ` · <a href="${esc(exp)}" target="_blank" rel="noopener">experiment ${p.experiment_id} ↗</a>` : ''}</p>${plan.kind === 'protocol'
   ? `<p class="labhint">Protocol: ${esc((plan.protocol || {}).title || '')} · ${plan.samples.length} sample${plan.samples.length === 1 ? '' : 's'}${plan.samples.length ? ': ' + esc(plan.samples.map((x) => x.title).join(', ')) : ''}${plan.modification ? ` · <b>This run:</b> ${esc(plan.modification)}` : ''}</p>${genStepsHtml(plan.steps)}`
   : previewHtml(plan, false)}</div>${act}`;
       startClocks();
+      startBalance(p);
       if (p.booking_end && 'Notification' in window && Notification.permission === 'default') Notification.requestPermission();
     } catch (err) { problem(panel, err); }
+  }
+
+  // Balances on the lab bus: live weight on the run page, Zero / Tare, and "Record in this run" (written in your name).
+  let balTimer = null;
+  function startBalance(p) {
+    clearInterval(balTimer);
+    if (!p.mine || p.status !== 'saved' || !p.experiment_id) return;
+    const tick = async () => {
+      const box = $('#lab-balance');
+      if (!box || L.runId !== p.id) { clearInterval(balTimer); return; }
+      let list;
+      try { list = (await api('balances')).balances; } catch { return; }
+      if (!list.length) { box.innerHTML = ''; return; }
+      if (!box.querySelector('[data-bal]')) box.innerHTML = list.map((b) => balanceCard(b, p)).join('');
+      list.forEach((b) => {
+        const w = box.querySelector(`[data-bal="${b.id}"] .balw`), st = box.querySelector(`[data-bal="${b.id}"] .balst`);
+        if (!w) return;
+        w.textContent = b.value == null ? '—' : `${Number(b.value).toFixed(2)} ${b.unit || 'g'}`;
+        const word = { ok: 'stable', moving: 'settling…', over: 'over range', under: 'under range', offline: 'not connected' }[b.state] || b.state;
+        st.textContent = word; st.className = `balst bal-${b.state}`;
+      });
+    };
+    tick(); balTimer = setInterval(tick, 1000);
+  }
+
+  function balanceCard(b, p) {
+    const ins = ((L.cat && L.cat.instruments) || []).find((r) => String(r.id) === String(b.id));
+    return `<form class="labcard balcard" data-bal="${esc(b.id)}" data-lab-form="balance" data-exp="${p.experiment_id}">
+<div class="labrow"><b>${esc(ins ? ins.title : 'Balance ' + b.id)}</b><span class="balw" aria-live="polite">—</span><span class="balst"></span></div>
+<div class="labrow"><button type="button" class="link" data-bal-cmd="zero">Zero</button><button type="button" class="link" data-bal-cmd="tare">Tare</button>
+<input name="label" maxlength="200" placeholder="What is it? e.g. agarose" aria-label="What was weighed"><button class="btn">Record in this run</button></div></form>`;
   }
 
   // A bench screen beside the work shows this run step by step; its Next/Done buttons tick the steps in the notebook.
@@ -1123,6 +1155,12 @@ ${ins.length ? `<p class="labhint">${n.kind === 'material' ? 'Used in' : 'From'}
       else { L.refEntry = null; L.choice.reference = ''; }
       $('#lab-ref').innerHTML = refHtml(); updatePreview(); return;
     }
+    const bc = ev.target.closest('[data-bal-cmd]');
+    if (bc) {
+      const id = bc.closest('[data-bal]').dataset.bal;
+      api(`balances/${id}`, { method: 'POST', body: { action: bc.dataset.balCmd } }).then(() => toast(bc.dataset.balCmd === 'zero' ? 'Zeroed' : 'Tared')).catch((err) => toast(err.message));
+      return;
+    }
     const bh = ev.target.closest('[data-bench-show],[data-bench-leave]');
     if (bh && L.atBench) {
       const id = L.atBench.bench.id;
@@ -1232,6 +1270,9 @@ ${ins.length ? `<p class="labhint">${n.kind === 'material' ? 'Used in' : 'From'}
         if (f.dataset.present) { const i = L.slide; L.sem = await api('seminar'); present(i); f.reset(); } else renderSeminar();
       } else if (kind === 'semday') {
         await api('seminar/day', { method: 'POST', body: { day: fd.get('day') } }); toast('Seminar moved'); renderSeminar();
+      } else if (kind === 'balance') {
+        const r = await api(`balances/${f.dataset.bal}`, { method: 'POST', body: { action: 'record', experiment: Number(f.dataset.exp), label: fd.get('label') } });
+        toast(`Recorded ${r.value} ${r.unit}${r.label ? ' (' + r.label + ')' : ''} in the experiment`); f.reset();
       } else if (kind === 'pio') {
         const r = await api('protocols/pio', { method: 'POST', body: { ref: fd.get('ref') } });
         toast(`Imported “${r.title}” with ${r.steps} steps`); await afterNewProtocol(r);
