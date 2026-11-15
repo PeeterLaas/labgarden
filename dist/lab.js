@@ -529,7 +529,7 @@ ${r.results.map((x) => `<button type="button" class="refrow" data-ref-pick="${es
           ? `<div class="labcard"><h3>${running ? 'Running' : 'Run finished'} on ${esc(ins ? ins.title : 'the instrument')}</h3><p class="bigclock" data-lab-clock="${esc(p.booking_end)}"></p><p class="labhint">Others see the instrument as busy until then.</p></div>`
           : `<form class="labcard labrow" data-lab-form="start"><b>Start the run</b><label>Run time <input class="n" type="number" name="minutes" min="1" max="1440" value="${esc(plan.kind === 'protocol' ? plan.run_minutes || 60 : plan.recipe.run_minutes || 90)}"> min</label>
 <button class="btn"${ins ? '' : ' disabled'}>▶ Start timer${ins ? ' and book ' + esc(ins.title) : ''}</button>${ins ? '' : `<span class="labhint">No ${plan.kind === 'protocol' ? 'instrument' : 'thermocycler'} was chosen for this run.</span>`}</form>`;
-        act += (plan.kind === 'protocol' ? '' : gelHtml(p)) + shareHtml(p);
+        act += benchHtml(p) + (plan.kind === 'protocol' ? '' : gelHtml(p)) + shareHtml(p);
       } else if (p.gel_upload) act += gelHtml(p);
       panel.innerHTML = `<p><a href="#planner" data-lab-back>← Planner</a></p><div class="labcard"><h2>${esc(plan.title)}</h2>
 <p class="labhint">${esc(p.created_by)} · ${esc(p.status)}${exp ? ` · <a href="${esc(exp)}" target="_blank" rel="noopener">experiment ${p.experiment_id} ↗</a>` : ''}</p>${plan.kind === 'protocol'
@@ -538,6 +538,17 @@ ${r.results.map((x) => `<button type="button" class="refrow" data-ref-pick="${es
       startClocks();
       if (p.booking_end && 'Notification' in window && Notification.permission === 'default') Notification.requestPermission();
     } catch (err) { problem(panel, err); }
+  }
+
+  // A bench screen beside the work shows this run step by step; its Next/Done buttons tick the steps in the notebook.
+  function benchHtml(p) {
+    const benches = (L.me && L.me.benches) || [];
+    if (!benches.length) return '';
+    const on = benches.find((b) => b.id === p.bench_id);
+    const n = (p.plan.kind === 'protocol' ? (p.plan.steps || []).length : 0);
+    return `<div class="labcard labrow"><b>Bench screen</b>
+<select data-bench-pick aria-label="Show this run on a bench screen"><option value="">— not shown —</option>${benches.map((b) => `<option value="${esc(b.id)}"${b.id === p.bench_id ? ' selected' : ''}>${esc(b.name)}</option>`).join('')}</select>
+<span class="labhint">${on ? `On ${esc(on.name)}, step ${(p.bench_step || 0) + 1}${n ? ' of ' + n : ''}. Its Next and Done buttons tick the steps in your experiment.` : 'Show the steps and the timer on the screen beside you.'}</span></div>`;
   }
 
   function startClocks() {
@@ -1051,6 +1062,11 @@ ${ins.length ? `<p class="labhint">${n.kind === 'material' ? 'Used in' : 'From'}
     else if (t.matches('[data-lab-vol]')) { L.choice.volumes[t.dataset.labVol] = t.value; updatePreview(); }
     else if (t.matches('[data-lab-total]')) { L.choice[t.dataset.labTotal] = t.value; updatePreview(); }
     else if (t.matches('[data-lab-tickwho]')) { L.tickWho = t.value; renderTicker(); }
+    else if (t.matches('[data-bench-pick]')) {
+      api(`plans/${L.runId}/bench`, { method: 'POST', body: { bench: t.value || null } })
+        .then((r) => { L.run = r; toast(t.value ? 'Shown on the bench screen' : 'Taken off the bench screen'); renderPlanner(); })
+        .catch((err) => toast(err.message));
+    }
     else if (t.matches('[data-fb-filter]')) { L.fbFilter = t.value; renderFeedback(); }
     else if (t.matches('[data-fb-file]')) { L.fbPic = t.files[0] || null; const s = $('#fb-pasted'); if (s) s.textContent = ''; }
     else if (t.matches('[data-proj-pick]')) { L.projId = Number(t.value); renderLabGraph(); }
