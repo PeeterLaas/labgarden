@@ -19,6 +19,7 @@
     choice: { title: '', project: '', reference: '', protocol: '', mix: '', primer_f: '', primer_r: '', instrument: '', positive: '', samples: [], more: '', ntc: true, extra_pct: 13, modification: '', volumes: {}, volume_ul: '', template_ul: '' },
     preview: null, runId: null, run: null, people: null, tickWho: 'me', timers: [],
     refEntry: null, refTimer: null, askFound: null, manus: null, manuId: null, projId: null, graph: null, map: null, level: 0, placeKey: null, arranging: false, stashing: false, sem: null, slide: -1,
+    proto: null, protoQ: '', pioResults: null,
     fb: null, fbId: null, fbFilter: 'open', fbFrom: '', fbPic: null,
   };
 
@@ -233,16 +234,150 @@ ${t.mine ? `<details><summary class="labhint">＋ Attach next tick</summary><for
   }
 
   // ---------- Planner ----------
+  // The Planner opens on "what are you running?": recent, the workgroup's protocols, protocols.io, a new one.
+  // A PCR protocol opens the master-mix form; any other protocol opens the general run form.
   async function renderPlanner() {
     const panel = $('#panel-planner');
-    if (L.runId) return renderRun(panel);
-    if (!panel.querySelector('[data-lab-planner]')) panel.innerHTML = '<p class="labhint">Loading the lab’s records…</p>';
+    if (L.runId) { delete panel.dataset.mode; return renderRun(panel); }
+    const mode = !L.proto ? 'choose' : L.proto.pcr ? 'pcr' : `gen:${L.proto.type}:${L.proto.id}`;
+    if (panel.dataset.mode !== mode) panel.innerHTML = '<p class="labhint">Loading the lab’s records…</p>';
     try {
       if (!L.cat) L.cat = await api('catalogue');
       const plans = await api('plans');
-      if (!panel.querySelector('[data-lab-planner]')) { panel.innerHTML = plannerHtml(plans); updatePreview(); }
-      else $('#lab-runs').innerHTML = runsHtml(plans);
-    } catch (err) { problem(panel, err); }
+      if (panel.dataset.mode === mode && $('#lab-runs')) { $('#lab-runs').innerHTML = runsHtml(plans); return; }
+      panel.dataset.mode = mode;
+      if (!L.proto) panel.innerHTML = chooserHtml(plans);
+      else if (L.proto.pcr) { panel.innerHTML = plannerHtml(plans); updatePreview(); }
+      else { panel.innerHTML = genHtml(plans); genPreview(); }
+    } catch (err) { delete panel.dataset.mode; problem(panel, err); }
+  }
+
+  const PROTO_BADGE = (r) => [r.pcr ? '<span class="chip">PCR · master mix</span>' : '', r.type === 'template' ? '<span class="chip">template</span>' : '',
+    r.source ? `<span class="chip">from ${esc(r.source)}</span>` : '', r.relevant ? '★' : ''].join(' ');
+
+  function protoCard(r, extra = '') {
+    return `<button type="button" class="labcard protocard" data-proto-pick="${esc(r.type)}:${esc(r.id ?? '')}" data-pcr="${r.pcr ? 1 : 0}" data-title="${esc(r.title)}">
+<b>${esc(r.title)}</b><span class="labhint">${PROTO_BADGE(r)}${extra}</span></button>`;
+  }
+
+  function chooserHtml(plans) {
+    const lib = L.cat.library || { recent: [], protocols: [], protocolsio: false };
+    const q = (L.protoQ || '').toLowerCase();
+    const wg = lib.protocols.filter((r) => !q || r.title.toLowerCase().includes(q));
+    return `<div data-lab-chooser><div class="labcard"><h2>What are you running?</h2>
+<p class="labhint">Pick a protocol. PCR protocols get the master-mix calculator; any other protocol becomes a run with its steps to tick off. Or type what you want in Ask PAIvik above.</p>
+${lib.recent.length ? `<h3>Recently used</h3><div class="protogrid">${lib.recent.map((r) => protoCard(r, ` · last: ${esc(r.run)} · ${esc(when(r.last))}`)).join('')}</div>` : ''}
+<h3>Workgroup protocols</h3>
+<div class="protogrid">${protoCard({ type: 'pcr', id: 'default', title: 'PCR with the default recipe', pcr: true })}</div>
+<input type="search" data-proto-q value="${esc(L.protoQ || '')}" placeholder="Filter ${lib.protocols.length} protocols and templates" aria-label="Filter protocols">
+<div class="protogrid" id="lab-protolist">${wg.map((r) => protoCard(r)).join('') || `<p class="labhint">${lib.protocols.length ? 'Nothing matches.' : 'No protocols in the notebook yet: import one or write a new one below.'}</p>`}</div></div>
+<details class="labcard" ${L.pioResults ? 'open' : ''}><summary><b>Import from protocols.io</b></summary>
+${lib.protocolsio ? `<form data-lab-form="pio" class="labrow"><input name="ref" required maxlength="400" placeholder="Paste a protocols.io link or DOI" aria-label="protocols.io link or DOI"><button class="btn">Import</button></form>
+<p class="labhint">Or search public protocols:</p><input type="search" data-pio-q placeholder="e.g. agarose gel, DNeasy, Nanopore library" aria-label="Search protocols.io">
+<div id="lab-pio-results">${pioHtml()}</div>
+<p class="labhint">An imported protocol becomes a Protocols record in your team, with its authors, version, link and licence. Steps are copied as text; check them before the first run.</p>`
+    : '<p class="labhint">protocols.io import is not set up on this lab server yet (an administrator adds one protocols.io access token).</p>'}</details>
+<details class="labcard"><summary><b>Create a new protocol</b></summary>
+<form data-lab-form="newproto" class="labform"><label>Name <input name="title" required maxlength="200" placeholder="e.g. DNA extraction from snail gut (PowerSoil)"></label>
+<label>Steps <small class="labhint">one per line</small><textarea name="steps" rows="6" maxlength="40000" placeholder="Weigh 0.25 g of tissue into a bead tube&#10;Add 800 µL CD1, vortex 10 min&#10;Centrifuge 1 min at 15 000 g"></textarea></label>
+<label>What it is for <small class="labhint">optional</small><input name="description" maxlength="2000"></label>
+<label class="pick"><input type="checkbox" name="pcr"> It is a PCR protocol (use the master-mix calculator)</label>
+<button class="btn">Create and use it</button><p class="labhint">Saved in your team’s Protocols, readable by the workgroup.</p></form></details>
+</div><div id="lab-runs">${runsHtml(plans)}</div>`;
+  }
+
+  function pioHtml() {
+    const r = L.pioResults;
+    if (!r) return '';
+    if (!r.length) return '<p class="labhint">Nothing found on protocols.io.</p>';
+    return r.map((x) => `<div class="refrow pio"><span><b>${esc(x.title)}</b><small class="labhint">${esc(x.authors)}${x.doi ? ' · ' + esc(x.doi) : ''}</small></span>
+<button type="button" class="btn" data-pio-import="${esc(x.uri)}">Import</button></div>`).join('');
+  }
+
+  let pioTimer = null;
+  async function pioSearch(q) {
+    try { L.pioResults = q.trim().length < 2 ? null : (await api('protocols/pio?q=' + encodeURIComponent(q))).results; }
+    catch (err) { L.pioResults = null; toast(err.message); }
+    const box = $('#lab-pio-results'); if (box) box.innerHTML = pioHtml();
+  }
+
+  async function pickProtocol(type, id, pcr, title) {
+    L.askFound = null;
+    if (pcr) {
+      L.proto = { type, id, title, pcr: true };
+      L.choice.protocol = type === 'protocol' ? String(id) : '';
+    } else {
+      L.proto = await api(`protocols/detail?type=${encodeURIComponent(type)}&id=${encodeURIComponent(id)}`);
+      if (L.proto.pcr) { L.choice.protocol = type === 'protocol' ? String(id) : ''; }
+    }
+    L.choice.title = ''; L.choice.samples = []; L.choice.more = ''; L.choice.modification = '';
+    renderPlanner();
+  }
+
+  async function afterNewProtocol(r) {
+    L.cat = null; L.pioResults = null;
+    L.cat = await api('catalogue');
+    await pickProtocol(r.type || 'protocol', r.id, !!r.pcr, r.title || '');
+  }
+
+  // ---------- general run (any protocol that is not PCR) ----------
+  function genHtml(plans) {
+    const c = L.choice, cat = L.cat, p = L.proto;
+    const samples = cat.samples.map((r) => `<label class="pick"><input type="checkbox" data-lab-sample value="${r.id}"${c.samples.includes(String(r.id)) ? ' checked' : ''}>
+<span>${r.relevant ? '★ ' : ''}${esc(r.title)} <small>${esc(r.category)}</small>${r.where ? `<br><small>📍 ${esc(r.where)}</small>` : ''}</span></label>`).join('')
+      || '<p class="labhint">No samples in the notebook yet. Type them below.</p>';
+    return `<p><button type="button" class="link" data-proto-back>← Other protocol</button></p><div class="planner" data-lab-planner>
+<form class="labcard labform" data-lab-form="gen" autocomplete="off">
+<h2>${esc(p.title)}</h2>${p.source && p.source.site ? `<p class="labhint">From ${esc(p.source.site)}${p.source.url ? ` · <a href="${esc(p.source.url)}" target="_blank" rel="noopener">original ↗</a>` : ''}${p.source.licence ? ' · ' + esc(p.source.licence) : ''}</p>` : ''}
+<label>Run name <input type="text" name="title" maxlength="200" value="${esc(c.title)}" placeholder="${esc(p.title)}"></label>
+<div class="labgrid">
+${(cat.projects || []).length ? `<label>Project <select name="project">${opts(cat.projects, c.project, '— no project —')}</select></label>` : ''}
+<label>Instrument <select name="instrument">${opts(cat.instruments, c.instrument)}</select></label>
+<label>Run time <input type="number" name="run_minutes" min="1" max="1440" value="${esc(c.run_minutes || 60)}"> min</label>
+</div>
+<fieldset><legend>Samples</legend><div class="picks">${samples}</div>
+<label>Other samples <small class="labhint">one per line</small><textarea name="more" rows="2" maxlength="4000">${esc(c.more)}</textarea></label></fieldset>
+<label>Change to the protocol for this run <input type="text" name="modification" maxlength="500" value="${esc(c.modification)}" placeholder="e.g. 2 × elution with 50 µL"></label>
+</form>
+<div class="labcard" id="lab-preview"><div id="lab-gen-summary" aria-live="polite"></div>
+<div class="labrow"><button type="button" class="btn" data-gen-save>Save run to the notebook</button><span class="labhint">Creates the experiment in your name with these steps to tick off; private until you share it.</span></div></div>
+</div><div id="lab-runs">${runsHtml(plans)}</div>`;
+  }
+
+  function readGenForm() {
+    const f = $('[data-lab-form="gen"]'); if (!f) return;
+    const fd = new FormData(f), c = L.choice;
+    ['title', 'project', 'instrument', 'modification', 'more', 'run_minutes'].forEach((k) => { c[k] = fd.get(k) ?? ''; });
+  }
+
+  function genStepsHtml(steps) {
+    return steps.length ? `<ol class="tight">${steps.map((x) => `<li>${esc(x)}</li>`).join('')}</ol>` : '<p class="labhint">This protocol has no steps written down yet; the run gets your notes only.</p>';
+  }
+
+  function genPreview() {
+    const box = $('#lab-gen-summary'); if (!box || !L.proto) return;  // the Save button stays put, so a click is never lost to a redraw
+    readGenForm();
+    const c = L.choice, cat = L.cat, p = L.proto;
+    const names = c.samples.map((id) => (cat.samples.find((r) => String(r.id) === String(id)) || {}).title).filter(Boolean)
+      .concat(String(c.more || '').split('\n').map((x) => x.trim()).filter(Boolean));
+    box.innerHTML = `<h3>${esc(c.title || p.title)}</h3>
+<p class="labhint">${names.length} sample${names.length === 1 ? '' : 's'}${names.length ? ': ' + esc(names.join(', ')) : ''}${c.modification ? ` · <b>This run:</b> ${esc(c.modification)}` : ''}</p>
+<h4>Steps ${p.type === 'template' ? '(from the template)' : ''}</h4>${genStepsHtml(p.steps)}`;
+  }
+
+  async function saveGen(btn) {
+    readGenForm();
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      const c = L.choice;
+      const draft = await api('plans/new', { method: 'POST', body: { kind: 'protocol', protocol_ref: { id: L.proto.id, type: L.proto.type }, title: c.title,
+        project: c.project, instrument: c.instrument, samples: c.samples, more: String(c.more || '').split('\n').map((x) => x.trim()).filter(Boolean),
+        modification: c.modification, run_minutes: c.run_minutes } });
+      const saved = await api(`plans/${draft.id}/save`, { method: 'POST', body: { hash: draft.hash } });
+      toast('Saved to the notebook');
+      L.choice.samples = []; L.choice.title = ''; L.choice.more = ''; L.choice.modification = '';
+      openRun(saved.id);
+    } catch (err) { toast(err.message); } finally { btn.disabled = false; btn.textContent = 'Save run to the notebook'; }
   }
 
   function opts(rows, sel, blank = '— none —') {
@@ -258,9 +393,9 @@ ${t.mine ? `<details><summary class="labhint">＋ Attach next tick</summary><for
       || '<p class="labhint">No samples in the notebook yet. Type them below.</p>';
     const understood = L.askFound ? `<div class="labcard askfound"><div class="labrow"><b>Filled in from your words</b><button type="button" class="link" data-ask-clear aria-label="Hide">✕</button></div>
 <ul class="tight">${L.askFound.map((f) => `<li>${esc(f)}</li>`).join('') || '<li>Nothing matched the notebook; pick below.</li>'}</ul><p class="labhint">Check and change anything below, then save.</p></div>` : '';
-    return `${understood}<div class="planner" data-lab-planner>
+    return `${understood}<p><button type="button" class="link" data-proto-back>← Other protocol</button></p><div class="planner" data-lab-planner>
 <form class="labcard labform" data-lab-form="plan" autocomplete="off">
-<h2>PCR</h2>
+<h2>PCR${L.proto && L.proto.title && L.proto.type !== 'pcr' ? ' · ' + esc(L.proto.title) : ''}</h2>
 <label>Run name <input type="text" name="title" maxlength="200" value="${esc(c.title)}" placeholder="e.g. 16S colony PCR, plate 3"></label>
 <div class="labgrid">
 ${(cat.projects || []).length ? `<label>Project <select name="project">${opts(cat.projects, c.project, '— no project —')}</select></label>` : ''}
@@ -303,6 +438,7 @@ ${(cat.projects || []).length ? `<label>Project <select name="project">${opts(ca
 
   let previewTimer = null;
   function updatePreview() {
+    if (L.proto && !L.proto.pcr) return genPreview();
     clearTimeout(previewTimer);
     previewTimer = setTimeout(async () => {
       const box = $('#lab-preview');
@@ -391,12 +527,14 @@ ${r.results.map((x) => `<button type="button" class="refrow" data-ref-pick="${es
         const running = p.booking_end && new Date(p.booking_end) > new Date();
         act += p.booking_end
           ? `<div class="labcard"><h3>${running ? 'Running' : 'Run finished'} on ${esc(ins ? ins.title : 'the instrument')}</h3><p class="bigclock" data-lab-clock="${esc(p.booking_end)}"></p><p class="labhint">Others see the instrument as busy until then.</p></div>`
-          : `<form class="labcard labrow" data-lab-form="start"><b>Start the run</b><label>Run time <input class="n" type="number" name="minutes" min="1" max="1440" value="${esc(plan.recipe.run_minutes || 90)}"> min</label>
-<button class="btn"${ins ? '' : ' disabled'}>▶ Start timer${ins ? ' and book ' + esc(ins.title) : ''}</button>${ins ? '' : '<span class="labhint">No thermocycler was chosen for this run.</span>'}</form>`;
-        act += gelHtml(p) + shareHtml(p);
+          : `<form class="labcard labrow" data-lab-form="start"><b>Start the run</b><label>Run time <input class="n" type="number" name="minutes" min="1" max="1440" value="${esc(plan.kind === 'protocol' ? plan.run_minutes || 60 : plan.recipe.run_minutes || 90)}"> min</label>
+<button class="btn"${ins ? '' : ' disabled'}>▶ Start timer${ins ? ' and book ' + esc(ins.title) : ''}</button>${ins ? '' : `<span class="labhint">No ${plan.kind === 'protocol' ? 'instrument' : 'thermocycler'} was chosen for this run.</span>`}</form>`;
+        act += (plan.kind === 'protocol' ? '' : gelHtml(p)) + shareHtml(p);
       } else if (p.gel_upload) act += gelHtml(p);
       panel.innerHTML = `<p><a href="#planner" data-lab-back>← Planner</a></p><div class="labcard"><h2>${esc(plan.title)}</h2>
-<p class="labhint">${esc(p.created_by)} · ${esc(p.status)}${exp ? ` · <a href="${esc(exp)}" target="_blank" rel="noopener">experiment ${p.experiment_id} ↗</a>` : ''}</p>${previewHtml(plan, false)}</div>${act}`;
+<p class="labhint">${esc(p.created_by)} · ${esc(p.status)}${exp ? ` · <a href="${esc(exp)}" target="_blank" rel="noopener">experiment ${p.experiment_id} ↗</a>` : ''}</p>${plan.kind === 'protocol'
+  ? `<p class="labhint">Protocol: ${esc((plan.protocol || {}).title || '')} · ${plan.samples.length} sample${plan.samples.length === 1 ? '' : 's'}${plan.samples.length ? ': ' + esc(plan.samples.map((x) => x.title).join(', ')) : ''}${plan.modification ? ` · <b>This run:</b> ${esc(plan.modification)}` : ''}</p>${genStepsHtml(plan.steps)}`
+  : previewHtml(plan, false)}</div>${act}`;
       startClocks();
       if (p.booking_end && 'Notification' in window && Notification.permission === 'default') Notification.requestPermission();
     } catch (err) { problem(panel, err); }
@@ -701,6 +839,7 @@ ${t.notes.map((n) => `<div class="cm semnote"><b>${esc(n.name)}</b>: ${esc(n.tex
       if (r.kind === 'plan') {
         L.choice = { ...L.choice, ...r.choices, volumes: {}, volume_ul: '', template_ul: '' };
         L.askFound = r.found; L.runId = null; out.hidden = true; out.innerHTML = '';
+        L.proto = { type: 'pcr', id: 'default', title: '', pcr: true };
         const panel = $('#panel-planner'); if (panel) panel.innerHTML = '';
         if (location.hash !== '#planner') location.hash = 'planner'; else renderPlanner();
         $('#lab-ask-text').value = '';
@@ -908,7 +1047,7 @@ ${ins.length ? `<p class="labhint">${n.kind === 'material' ? 'Used in' : 'From'}
       const s = L.choice.samples, i = s.indexOf(t.value);
       if (t.checked && i < 0) s.push(t.value); if (!t.checked && i >= 0) s.splice(i, 1);
       updatePreview();
-    } else if (t.closest('[data-lab-form="plan"]')) updatePreview();
+    } else if (t.closest('[data-lab-form="plan"],[data-lab-form="gen"]')) updatePreview();
     else if (t.matches('[data-lab-vol]')) { L.choice.volumes[t.dataset.labVol] = t.value; updatePreview(); }
     else if (t.matches('[data-lab-total]')) { L.choice[t.dataset.labTotal] = t.value; updatePreview(); }
     else if (t.matches('[data-lab-tickwho]')) { L.tickWho = t.value; renderTicker(); }
@@ -928,7 +1067,13 @@ ${ins.length ? `<p class="labhint">${n.kind === 'material' ? 'Used in' : 'From'}
   });
   document.addEventListener('input', (ev) => {
     if (ev.target.matches('[data-ref-q]')) { L.refQ = ev.target.value; clearTimeout(L.refTimer); L.refTimer = setTimeout(refSearch, 300); return; }
-    if (ev.target.closest('[data-lab-form="plan"]') && ev.target.matches('input[type=text],input[type=number],textarea')) updatePreview();
+    if (ev.target.closest('[data-lab-form="plan"],[data-lab-form="gen"]') && ev.target.matches('input[type=text],input[type=number],textarea')) updatePreview();
+    if (ev.target.matches('[data-proto-q]')) {
+      L.protoQ = ev.target.value; const q = L.protoQ.toLowerCase(), all = (L.cat.library || { protocols: [] }).protocols;
+      const hit = all.filter((r) => !q || r.title.toLowerCase().includes(q));
+      $('#lab-protolist').innerHTML = hit.map((r) => protoCard(r)).join('') || '<p class="labhint">Nothing matches.</p>';
+    }
+    if (ev.target.matches('[data-pio-q]')) { clearTimeout(pioTimer); const v = ev.target.value; pioTimer = setTimeout(() => pioSearch(v), 450); }
   });
   document.addEventListener('toggle', (ev) => {
     if (ev.target.matches && ev.target.matches('[data-ref-details]')) { L.refOpen = ev.target.open; if (ev.target.open) refSearch(); }
@@ -942,6 +1087,21 @@ ${ins.length ? `<p class="labhint">${n.kind === 'material' ? 'Used in' : 'From'}
       if (rf.matches('[data-ref-pick]')) { L.refEntry = (L.refResults || []).find((x) => x.archive_id === rf.dataset.refPick) || null; L.choice.reference = rf.dataset.refPick; }
       else { L.refEntry = null; L.choice.reference = ''; }
       $('#lab-ref').innerHTML = refHtml(); updatePreview(); return;
+    }
+    const pp = ev.target.closest('[data-proto-pick],[data-proto-back],[data-pio-import],[data-gen-save]');
+    if (pp) {
+      if (pp.matches('[data-gen-save]')) { saveGen(pp); return; }
+      if (pp.matches('[data-proto-back]')) { L.proto = null; L.askFound = null; renderPlanner(); return; }
+      if (pp.matches('[data-pio-import]')) {
+        pp.disabled = true; pp.textContent = 'Importing…';
+        api('protocols/pio', { method: 'POST', body: { ref: pp.dataset.pioImport } })
+          .then((r) => { toast(`Imported “${r.title}” with ${r.steps} steps`); return afterNewProtocol(r); })
+          .catch((err) => { toast(err.message); pp.disabled = false; pp.textContent = 'Import'; });
+        return;
+      }
+      const [type, ...rest] = pp.dataset.protoPick.split(':');
+      pickProtocol(type, rest.join(':'), pp.dataset.pcr === '1', pp.dataset.title).catch((err) => toast(err.message));
+      return;
     }
     const fbt = ev.target.closest('[data-fb-open],#lab-report');
     if (fbt) { fbClick(fbt).catch((err) => toast(err.message)); return; }
@@ -976,7 +1136,7 @@ ${ins.length ? `<p class="labhint">${n.kind === 'material' ? 'Used in' : 'From'}
     if (!f) return;
     ev.preventDefault();
     const kind = f.dataset.labForm, fd = new FormData(f), btn = f.querySelector('button');
-    if (kind === 'plan') return;
+    if (kind === 'plan' || kind === 'gen') return;
     if (kind === 'ask') { if (btn) btn.disabled = true; await askPaivik(String(fd.get('text') || '').trim()); if (btn) btn.disabled = false; return; }
     if (btn) btn.disabled = true;
     try {
@@ -1028,6 +1188,12 @@ ${ins.length ? `<p class="labhint">${n.kind === 'material' ? 'Used in' : 'From'}
         if (f.dataset.present) { const i = L.slide; L.sem = await api('seminar'); present(i); f.reset(); } else renderSeminar();
       } else if (kind === 'semday') {
         await api('seminar/day', { method: 'POST', body: { day: fd.get('day') } }); toast('Seminar moved'); renderSeminar();
+      } else if (kind === 'pio') {
+        const r = await api('protocols/pio', { method: 'POST', body: { ref: fd.get('ref') } });
+        toast(`Imported “${r.title}” with ${r.steps} steps`); await afterNewProtocol(r);
+      } else if (kind === 'newproto') {
+        const r = await api('protocols', { method: 'POST', body: { title: fd.get('title'), steps: fd.get('steps'), description: fd.get('description'), pcr: fd.get('pcr') === 'on' } });
+        toast('Protocol created'); await afterNewProtocol({ ...r, pcr: fd.get('pcr') === 'on', title: fd.get('title') });
       } else if (kind === 'feedback') {
         const r = await api('feedback', { method: 'POST', body: { kind: fd.get('kind'), title: fd.get('title'), text: fd.get('text'), place: fd.get('place'),
           context: { source: 'web', view: L.fbFrom || '', screen: `${innerWidth}×${innerHeight}`, browser: navigator.userAgent.slice(0, 200) } } });
