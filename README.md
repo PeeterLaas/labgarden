@@ -1,10 +1,59 @@
 # PAIvik (Labgarden)
 
-Research, kept connected. A local-first research workspace in University of Tartu style: capture notes, files and voice memos, connect them into a research graph, and review every suggested change. The browser app runs and stores its data on your device; an optional local R companion uses a separate on-disk workspace. Hosted by a lab next to its PAIvik gateway, the same page also becomes the lab's front door to its eLabFTW notebook (**lab mode**, below).
+Research, kept connected. PAIvik is a lab's front door to its electronic notebook (eLabFTW), in University of Tartu
+style: plan a run, follow it step by step at the bench, see what the workgroup is doing, and let a seminar agenda
+build itself, all written into the notebook in each person's own name.
+
+The same static page works in two ways:
+
+- **Lab mode**, when a lab hosts it next to its own PAIvik gateway: the views below, with the lab's data staying on
+  the lab's server.
+- **On its own** (and always on the public site, https://peeterlaas.github.io/labgarden/): a private research
+  workspace in your browser. Nothing leaves your device.
+
+## Lab mode
+
+Switched on when the host serves a `lab.json` that points to the lab's PAIvik gateway (a separate, private service
+in front of eLabFTW). Lab data is read and written on the lab's server with each person's own notebook key and is never
+stored in the browser.
+
+- **Ask PAIvik**: one sentence in. "PCR of colonies 1–8 with 27F/1492R" opens the Planner filled in; anything else
+  becomes a note in the notebook, in the person's own words.
+- **Planner**: start from a recently used protocol, the workgroup's protocols and templates, an import from
+  protocols.io, or a new protocol. PCR runs get a master-mix calculator, tube and gel-lane lists and an instrument
+  timer; any other protocol becomes a run whose steps are copied into the experiment. A run can cite a published method
+  from the institute's protocol archive.
+- **Ticker**: each person's day as a feed of notebook entries, with comments, follow-up entries and **Print today** for
+  a paper notebook.
+- **Seminar**: the weekly agenda puts itself together from flagged entries, results and open questions; remarks go back
+  to the entries as comments, so the conversation carries on.
+- **Lab projects** graph from the notebook's links, and **Manuscripts**: a Materials & Methods outline compiled from
+  chosen entries.
+- **Lab map** of rooms, fridges, freezers and instruments, with sticky notes and "put today's products here".
+- **Instruments** with live bookings; **bench screens**, small touch displays beside the work that show a run step by
+  step and tick its steps (scan the screen's QR code to use it); **balances** whose live weight goes into a run.
+- **Feedback**: a button on every page for bugs, ideas and questions, answered in the same place.
+
+A person's own changes are written at once (mistakes are fixed afterwards); changes drafted by a model or an AI
+assistant wait for a person to approve them on the gateway's review page. On the public site lab mode never starts.
+The gateway and its deployment are private and not part of this repository.
+
+## The browser workspace
+
+- A research graph per project: capture notes, files (up to 50 MB) and voice memos, and connect them.
+- A rule-based gardener (plain rules, not an AI model) suggests record types and links and flags missing details; you
+  accept, edit or dismiss each suggestion.
+- Changes save on the click, with **Undo** and a full before/after history under **Review → Decided changes**.
+- Protocol version stacks and a MinION starter library ([details](docs/minion-library.md)), category avatars, JSON
+  export and import, light and dark mode, keyboard access and a phone layout.
+- Data lives in your browser (IndexedDB); clearing site data deletes it, so export to keep a copy.
+
+An optional local R/Shiny companion shares the same approval core and offers draft-only tools for an AI assistant
+([setup](docs/local-companion.md)).
 
 ## Run locally
 
-Requires Python 3. No dependency installation or build step is needed.
+Requires Python 3; nothing to install or build.
 
 ```sh
 python3 -m http.server 8000 --directory dist
@@ -12,67 +61,9 @@ python3 -m http.server 8000 --directory dist
 
 Open http://localhost:8000.
 
-## What works
-
-- Research graph per project: click a node for details, drag (or use arrow keys) to rearrange, edit, link, unlink and delete records, and add records directly.
-- Capture text notes, files (images, audio, CSV and others, up to 50 MB each) and voice notes recorded in the browser.
-- A rule-based gardener suggests a record type and links (matching names and IDs such as `014`) and flags missing collection times and possible duplicates.
-- Review: accept, edit then accept, or dismiss each suggestion; nothing joins the graph without it. Decided changes are kept as history.
-- Research changes save on the click that asks for them, with no second confirmation. The toast offers **Undo**, and every change, with its exact before/after, stays under **Review → Decided changes**, so mistakes are fixed afterwards. Undo is not offered when a change adds or removes stored files (for example deleting a capture whose file nothing else uses): the history keeps the record's metadata, not the file, so export first if you may need it. Only replacing the whole workspace (reset, import) asks once. Edits, relationships, deletions, project creation, imports and resets use the same approval service. Capturing evidence and moving graph nodes remain separate from committing research changes.
-- Previews for images, audio and CSV files; download the original file.
-- Several projects, data saved in IndexedDB across reloads, JSON export and import (including files), and reset to the sample.
-- Light and dark mode, keyboard access, and a phone layout.
-- Resources and protocol version stacks, with the newest dated revision in your library first. Older records and experiment links stay intact when adding a revision.
-- A MinION Sequencer starter library with separate MinION/Flongle records, full protocols, checklists and reference notes. Add it from **Resources & protocols → Add MinION library**; it is added at once and can be undone from the toast.
-- Category-wide avatars: choose an emoji, initials, or a local PNG/JPEG/WebP picture up to 256 KB from **Category avatars**. Labels remain visible and avatars travel with workspace exports.
-
-## Current scope
-
-On its own (and always on the public site) the browser app is not a connected laboratory system. Its data is stored in IndexedDB on the user's device and is never uploaded; clearing site data deletes it, so use Export to keep a copy. Suggestions come from simple rules, not an AI model.
-
-## Lab mode (optional)
-
-When a lab hosts `dist/` beside its own PAIvik gateway (a separate, private service in front of the lab's eLabFTW notebook) and serves a `lab.json` that points to it, extra views appear. Lab data is read and written on the lab's server with each person's own notebook key; it is never stored in the browser. On the public site lab mode never starts.
-
-- **Ask PAIvik**: one sentence in. "PCR of colonies 1–8 with 27F/1492R" opens the Planner filled in; anything else becomes a note in the notebook, in the person's own words.
-- **Ticker**: each person's day as a feed of notebook entries, with comments, attached follow-up entries and **Print today** for a paper notebook.
-- **Planner**: starts from a recently used protocol, the workgroup's protocols and templates, an import from protocols.io, or a new protocol. PCR runs get a master-mix calculator, tube and gel-lane lists and an instrument timer; any other protocol becomes a run whose steps are copied into the experiment to tick off. A run can cite a published method from the institute's protocol archive.
-- **Lab projects** graph built from the notebook's links, **Manuscripts** (a Materials & Methods outline compiled from chosen entries), and a **Seminar** agenda that puts itself together from flagged entries, results and open questions, with remarks going back to the entries as comments.
-- **Lab map** of rooms, fridges, freezers and instruments from the notebook's storage, with sticky notes and "put today's products here".
-- **Instruments** with live bookings, **bench screens** (small touch displays beside the work that show a run step by step and tick its steps, found by scanning their QR code) and **balances** whose live weight can be recorded into a run.
-- **Feedback**: a button on every page for bugs, ideas and questions, answered in the same place.
-
-A person's own changes are written at once in their name (mistakes are fixed afterwards); changes drafted by a model or an AI assistant wait for a person to approve them on the gateway's review page. The gateway and its deployment are private and not part of this repository.
-
-An optional **local R/Shiny + shinymcp companion** is now included. It shares the exact JavaScript validation/approval core, exposes search and draft tools, and provides a separate human approval console. It uses its own local text workspace, not automatic browser synchronization. See [local companion setup](docs/local-companion.md).
-
-## MinION resource library
-
-The catalog is metadata derived from the supplied source PDFs; the PDFs themselves are not included in this repository. After approving the starter library, choose **Attach source PDFs** and select the original files on your device. Matching uses SHA-256, so duplicate copies share one source record. Files stay in IndexedDB and can be opened or downloaded from the record details. A different source file must be attached to a new revision or separate record, not overwrite an existing source identity.
-
-Version stacks group a protocol family and platform, then group full protocols, checklists and alternate exports by revision. **Newest in library** means the newest unambiguously dated revision you have stored; no online latest-version check is performed. Unknown dates remain unranked. Use **New revision…** on a protocol to create a separate record, and attach its new source PDF. Existing experiments continue pointing to the revision they used.
-
-The supplied MinION catalog records 14 filenames as 13 unique PDF sources. Platform labels and kit scope come from the documents, with explicit review notes where filename and document heading differ. Supporting notes are separate from protocol versions. Adding a resource to this catalog does not certify workflow compatibility.
-
-## Project structure
-
-- `dist/index.html`: app shell (sidebar, graph/inbox/review views, capture form, About view, dialog)
-- `dist/style.css`: UT theme (signature blue #2C5696, deep blue #1B365D, Rubik), dark mode and phone layout
-- `dist/app.js`: storage, rendering, gardener rules, review, graph interaction, export/import
-- `dist/lab.js`: optional lab mode (off unless the host serves a `lab.json`)
-- `dist/change-service.js`: shared validation, immutable proposal previews, approval matching and audit events
-- `dist/resource-library.js`, `dist/catalogs/minion.json`: mergeable equipment catalog and protocol version grouping
-- `server/workspace.cjs`: local file-backed workspace and draft service
-- `R/`, `app.R`, `mcp.R`: R adapter, Shiny approval console and draft-only MCP tools
-- `dist/fonts/`: Rubik webfonts (SIL Open Font License, `OFL.txt`); `dist/favicon.svg`: PAIvik mark
-- `.openai/hosting.json`: existing Sites deployment configuration
-- `.github/workflows/check.yml`: JavaScript syntax, local assets, core approval tests and R/MCP integration tests
-- `.github/workflows/pages.yml`: validate and publish `dist/` to GitHub Pages
-- `.github/workflows/mirror-gitlab.yml`: mirror `main` to the UT GitLab copy
-
 ## Validate
 
-With Node.js and Python 3 installed:
+With Node.js and Python 3:
 
 ```sh
 node --check dist/app.js
@@ -82,15 +73,25 @@ python3 scripts/check_assets.py
 
 ## Deployment
 
-Pushes to `main` validate and publish `dist/` to GitHub Pages at https://peeterlaas.github.io/labgarden/. The deployment can also be run manually from Actions. The Sites deployment remains configured separately. Each push to `main` is also mirrored, fast-forward only, to the University of Tartu GitLab (`.github/workflows/mirror-gitlab.yml`); changes are merged on GitHub.
+Pushes to `main` validate and publish `dist/` to GitHub Pages, and are mirrored (fast-forward only) to the University
+of Tartu GitLab. Changes are merged on GitHub. The Sites deployment in `.openai/hosting.json` is configured separately.
 
-If initial Pages setup is blocked by repository permissions, select **GitHub Actions** in Settings → Pages → Build and deployment, then rerun the Deploy GitHub Pages workflow.
+## Project structure
+
+- `dist/index.html`, `dist/style.css`, `dist/app.js`: the page, the UT theme (#2C5696, #1B365D, Rubik), and the browser
+  workspace (storage, graph, gardener, review, export/import)
+- `dist/lab.js`: lab mode (off unless the host serves a `lab.json`)
+- `dist/change-service.js`: validation, previews, approval matching and audit events
+- `dist/resource-library.js`, `dist/catalogs/minion.json`: protocol version grouping and the MinION catalog
+- `server/`, `R/`, `app.R`, `mcp.R`: the optional local companion
+- `dist/fonts/`: Rubik (SIL Open Font License); `dist/favicon.svg`: the PAIvik mark
+- `.github/workflows/`: checks, GitHub Pages, and the GitLab mirror
 
 ## Roadmap
 
-- Shared project and workgroup notes that every lab member's AI assistant reads, with each note's readers chosen by the people who write it
+- Shared project and workgroup notes that every lab member's AI assistant reads, with each note's readers chosen by
+  the people who write it
 - Bench screens over the network, and data links to more instruments
-- Replaceable local model adapters for tagging, extraction and link suggestions in the browser-only workspace
-- Automatic synchronization between the browser workspace and the lab server
+- Synchronization between the browser workspace and the lab server
 
 Licensed under the MIT License. See [LICENSE](LICENSE).
