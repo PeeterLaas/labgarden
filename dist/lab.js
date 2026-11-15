@@ -91,7 +91,14 @@
     }
     refreshBadges();
     setInterval(refreshBadges, 60000);
-    const asked = new URLSearchParams(location.search).get('ask');  // e.g. a link Claude made: ?ask=PCR+of+colonies+1-8#planner
+    const q = new URLSearchParams(location.search);
+    if (q.get('b') && q.get('c') && L.me) {  // scanned the QR code on a bench screen: "I am at this bench"
+      history.replaceState(null, '', location.pathname + '#planner');
+      api(`benches/${encodeURIComponent(q.get('b'))}/claim`, { method: 'POST', body: { code: q.get('c') } })
+        .then((r) => { L.atBench = r; toast(`You are at the ${r.bench.name}`); const panel = $('#panel-planner'); if (panel) delete panel.dataset.mode; render('planner'); })
+        .catch((err) => toast(err.message));
+    }
+    const asked = q.get('ask');  // e.g. a link Claude made: ?ask=PCR+of+colonies+1-8#planner
     if (asked && L.me) {
       history.replaceState(null, '', location.pathname + location.hash);
       $('#lab-ask-text').value = asked.slice(0, 4000);
@@ -264,7 +271,7 @@ ${t.mine ? `<details><summary class="labhint">＋ Attach next tick</summary><for
     const lib = L.cat.library || { recent: [], protocols: [], protocolsio: false };
     const q = (L.protoQ || '').toLowerCase();
     const wg = lib.protocols.filter((r) => !q || r.title.toLowerCase().includes(q));
-    return `<div data-lab-chooser><div class="labcard"><h2>What are you running?</h2>
+    return `<div data-lab-chooser>${benchBanner()}<div class="labcard"><h2>What are you running?</h2>
 <p class="labhint">Pick a protocol. PCR protocols get the master-mix calculator; any other protocol becomes a run with its steps to tick off. Or type what you want in Ask PAIvik above.</p>
 ${lib.recent.length ? `<h3>Recently used</h3><div class="protogrid">${lib.recent.map((r) => protoCard(r, ` · last: ${esc(r.run)} · ${esc(when(r.last))}`)).join('')}</div>` : ''}
 <h3>Workgroup protocols</h3>
@@ -284,6 +291,18 @@ ${lib.protocolsio ? `<form data-lab-form="pio" class="labrow"><input name="ref" 
 <label class="pick"><input type="checkbox" name="pcr"> It is a PCR protocol (use the master-mix calculator)</label>
 <button class="btn">Create and use it</button><p class="labhint">Saved in your team’s Protocols, readable by the workgroup.</p></form></details>
 </div><div id="lab-runs">${runsHtml(plans)}</div>`;
+  }
+
+  // After scanning a bench screen's QR code: pick a run to show there (the screen offers the same).
+  function benchBanner() {
+    const at = L.atBench;
+    if (!at) return '';
+    const until = new Date(at.until).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return `<div class="labcard benchhere"><div class="labrow"><b>You are at the ${esc(at.bench.name)}</b><span class="labhint">until ${esc(until)}</span>
+<button type="button" class="link" data-bench-leave>Leave</button></div>
+${at.runs.length ? `<p class="labhint">Show one of your saved runs there, or plan a new one below and send it from its page:</p>
+<div class="protogrid">${at.runs.map((r) => `<button type="button" class="labcard protocard" data-bench-show="${r.id}"><b>${esc(r.title)}</b><span class="labhint">Show on the ${esc(at.bench.name)}</span></button>`).join('')}</div>`
+    : '<p class="labhint">You have no saved runs yet: plan one below, save it, and send it to the bench from its page.</p>'}</div>`;
   }
 
   function pioHtml() {
@@ -529,7 +548,7 @@ ${r.results.map((x) => `<button type="button" class="refrow" data-ref-pick="${es
           ? `<div class="labcard"><h3>${running ? 'Running' : 'Run finished'} on ${esc(ins ? ins.title : 'the instrument')}</h3><p class="bigclock" data-lab-clock="${esc(p.booking_end)}"></p><p class="labhint">Others see the instrument as busy until then.</p></div>`
           : `<form class="labcard labrow" data-lab-form="start"><b>Start the run</b><label>Run time <input class="n" type="number" name="minutes" min="1" max="1440" value="${esc(plan.kind === 'protocol' ? plan.run_minutes || 60 : plan.recipe.run_minutes || 90)}"> min</label>
 <button class="btn"${ins ? '' : ' disabled'}>▶ Start timer${ins ? ' and book ' + esc(ins.title) : ''}</button>${ins ? '' : `<span class="labhint">No ${plan.kind === 'protocol' ? 'instrument' : 'thermocycler'} was chosen for this run.</span>`}</form>`;
-        act += (plan.kind === 'protocol' ? '' : gelHtml(p)) + shareHtml(p);
+        act += benchHtml(p) + (plan.kind === 'protocol' ? '' : gelHtml(p)) + shareHtml(p);
       } else if (p.gel_upload) act += gelHtml(p);
       panel.innerHTML = `<p><a href="#planner" data-lab-back>← Planner</a></p><div class="labcard"><h2>${esc(plan.title)}</h2>
 <p class="labhint">${esc(p.created_by)} · ${esc(p.status)}${exp ? ` · <a href="${esc(exp)}" target="_blank" rel="noopener">experiment ${p.experiment_id} ↗</a>` : ''}</p>${plan.kind === 'protocol'
@@ -538,6 +557,17 @@ ${r.results.map((x) => `<button type="button" class="refrow" data-ref-pick="${es
       startClocks();
       if (p.booking_end && 'Notification' in window && Notification.permission === 'default') Notification.requestPermission();
     } catch (err) { problem(panel, err); }
+  }
+
+  // A bench screen beside the work shows this run step by step; its Next/Done buttons tick the steps in the notebook.
+  function benchHtml(p) {
+    const benches = (L.me && L.me.benches) || [];
+    if (!benches.length) return '';
+    const on = benches.find((b) => b.id === p.bench_id);
+    const n = (p.plan.kind === 'protocol' ? (p.plan.steps || []).length : 0);
+    return `<div class="labcard labrow"><b>Bench screen</b>
+<select data-bench-pick aria-label="Show this run on a bench screen"><option value="">— not shown —</option>${benches.map((b) => `<option value="${esc(b.id)}"${b.id === p.bench_id ? ' selected' : ''}>${esc(b.name)}</option>`).join('')}</select>
+<span class="labhint">${on ? `On ${esc(on.name)}, step ${(p.bench_step || 0) + 1}${n ? ' of ' + n : ''}. Its Next and Done buttons tick the steps in your experiment.` : 'Show the steps and the timer on the screen beside you.'}</span></div>`;
   }
 
   function startClocks() {
@@ -1051,6 +1081,11 @@ ${ins.length ? `<p class="labhint">${n.kind === 'material' ? 'Used in' : 'From'}
     else if (t.matches('[data-lab-vol]')) { L.choice.volumes[t.dataset.labVol] = t.value; updatePreview(); }
     else if (t.matches('[data-lab-total]')) { L.choice[t.dataset.labTotal] = t.value; updatePreview(); }
     else if (t.matches('[data-lab-tickwho]')) { L.tickWho = t.value; renderTicker(); }
+    else if (t.matches('[data-bench-pick]')) {
+      api(`plans/${L.runId}/bench`, { method: 'POST', body: { bench: t.value || null } })
+        .then((r) => { L.run = r; toast(t.value ? 'Shown on the bench screen' : 'Taken off the bench screen'); renderPlanner(); })
+        .catch((err) => toast(err.message));
+    }
     else if (t.matches('[data-fb-filter]')) { L.fbFilter = t.value; renderFeedback(); }
     else if (t.matches('[data-fb-file]')) { L.fbPic = t.files[0] || null; const s = $('#fb-pasted'); if (s) s.textContent = ''; }
     else if (t.matches('[data-proj-pick]')) { L.projId = Number(t.value); renderLabGraph(); }
@@ -1087,6 +1122,15 @@ ${ins.length ? `<p class="labhint">${n.kind === 'material' ? 'Used in' : 'From'}
       if (rf.matches('[data-ref-pick]')) { L.refEntry = (L.refResults || []).find((x) => x.archive_id === rf.dataset.refPick) || null; L.choice.reference = rf.dataset.refPick; }
       else { L.refEntry = null; L.choice.reference = ''; }
       $('#lab-ref').innerHTML = refHtml(); updatePreview(); return;
+    }
+    const bh = ev.target.closest('[data-bench-show],[data-bench-leave]');
+    if (bh && L.atBench) {
+      const id = L.atBench.bench.id;
+      (bh.matches('[data-bench-leave]')
+        ? api(`benches/${id}/leave`, { method: 'POST', body: {} }).then(() => { L.atBench = null; toast('Left the bench'); delete $('#panel-planner').dataset.mode; renderPlanner(); })
+        : api(`plans/${bh.dataset.benchShow}/bench`, { method: 'POST', body: { bench: id } }).then(() => { toast(`Shown on the ${L.atBench.bench.name}`); openRun(bh.dataset.benchShow); }))
+        .catch((err) => toast(err.message));
+      return;
     }
     const pp = ev.target.closest('[data-proto-pick],[data-proto-back],[data-pio-import],[data-gen-save]');
     if (pp) {

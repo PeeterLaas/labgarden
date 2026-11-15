@@ -414,3 +414,6 @@ select.manuadd{font:inherit;font-size:13px;border:1px solid var(--line);border-r
 [data-proto-q],[data-pio-q]{width:100%;font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text);margin:4px 0}
 .refrow.pio{display:flex;justify-content:space-between;align-items:center;gap:10px}
 .refrow.pio span{display:flex;flex-direction:column}
+
+/* Lab mode: at a bench screen */
+.benchhere{border-left:4px solid var(--ok)}
