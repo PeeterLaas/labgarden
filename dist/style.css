@@ -417,3 +417,9 @@ select.manuadd{font:inherit;font-size:13px;border:1px solid var(--line);border-r
 
 /* Lab mode: at a bench screen */
 .benchhere{border-left:4px solid var(--ok)}
+
+/* Lab mode: balance on the run page */
+.balcard .balw{font-size:28px;font-weight:500;font-variant-numeric:tabular-nums;margin-left:auto}
+.balst{font-size:13px;padding:1px 8px;border-radius:99px;border:1px solid var(--line);color:var(--muted)}
+.bal-ok{color:var(--ok);border-color:var(--ok)}.bal-offline,.bal-over,.bal-under{color:var(--danger);border-color:var(--danger)}
+.balcard input{flex:1;min-width:140px;font:inherit;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text)}
