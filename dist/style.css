@@ -344,6 +344,19 @@ body.sem-presenting{overflow:hidden}
 .labmap.haspic .place.room text.nm{font-weight:500;paint-order:stroke;stroke:var(--surface);stroke-width:4px}
 .labmap .grip{fill:var(--accent);stroke:none;cursor:nwse-resize}
 .labmap image.plan{opacity:.9}
+/* Live freezer states from tartuvaim (green ok, red too warm, amber silent / not watched) */
+.labmap .place.live-ok rect{stroke:var(--ok);stroke-width:3}
+.labmap .place.live-alarm rect{stroke:var(--danger);stroke-width:4;fill:color-mix(in srgb,var(--danger) 14%,var(--surface))}
+.labmap .place.live-silent rect,.labmap .place.live-stale rect{stroke:#B26A00;stroke-width:3;stroke-dasharray:7 4}
+.labmap .place.live-waiting rect{stroke:var(--muted);stroke-dasharray:4 4}
+.labmap .place.room.live-alarm rect{fill:var(--danger);fill-opacity:.12}
+.labmap .place text.lv{font-size:15px;font-weight:500;fill:var(--muted)}
+.labmap .place.live-ok text.lv{fill:var(--ok)}.labmap .place.live-alarm text.lv{fill:var(--danger)}
+.labmap .place.live-silent text.lv,.labmap .place.live-stale text.lv{fill:#B26A00}
+@keyframes livepulse{50%{stroke-opacity:.35}}
+.labmap .place.live-alarm rect{animation:livepulse 1.6s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.labmap .place.live-alarm rect{animation:none}}
+.chip.live-ok{color:var(--ok)}.chip.live-alarm{color:var(--danger)}.chip.live-silent,.chip.live-stale{color:#B26A00}.chip.live-waiting{color:var(--muted)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .labmap image.plan{filter:invert(.88) hue-rotate(180deg);opacity:.75}}
 .mapcrumbs{font-weight:500}.mapcrumbs .link{font-weight:400}
 .labask{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px}
