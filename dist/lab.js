@@ -83,9 +83,18 @@
     document.body.classList.add('lab-on');
     $$('[data-lab]').forEach((el) => { el.hidden = false; });
     const pr = $('#lab-print'); if (pr) pr.href = printToday();
+    const shown = location.hash.match(/^#display=([\w-]{20,200})$/);   // a wall screen's display key (after #: never sent in a URL)
+    if (shown) {
+      history.replaceState(null, '', location.pathname + '#seminar');
+      try {
+        await fetch(L.base + 'api/v1/display', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: shown[1] }) });
+      } catch { /* the slideshow says so below if it cannot load */ }
+    }
     try {
       L.me = await api('me');
-      $('.privacy').textContent = `Lab connected · ${L.me.user}`;
+      $('.privacy').textContent = L.me.display ? `Wall screen · ${L.me.device}` : `Lab connected · ${L.me.user}`;
+      if (L.me.display) { wallShow(); return; }  // a wall screen (display key): the Seminar slideshow, nothing else
     } catch (err) {
       $('.privacy').textContent = err.code === 'SIGN_IN' ? 'Lab: not signed in' : 'Lab server not reachable';
     }
@@ -116,7 +125,7 @@
   }
 
   async function refreshBadges() {
-    if (!L.me) return;
+    if (!L.me || L.me.display) return;
     try {
       const p = await api('proposals');
       const b = $('#count-lab-review'); if (b) b.textContent = p.pending || '';
@@ -875,6 +884,40 @@ ${t.notes.map((n) => `<div class="cm semnote"><b>${esc(n.name)}</b>: ${esc(n.tex
     else if (ev.key === 'ArrowLeft' || ev.key === 'PageUp') present(Math.max(0, L.slide - 1));
     else if (ev.key === 'Escape') present(-1);
   });
+
+  // ---------- the wall screen: a display key shows the Seminar agenda as a slideshow, read-only ----------
+  const WALL_SLIDE_MS = 20000, WALL_RELOAD_MS = 5 * 60000;
+  async function wallShow() {
+    document.body.classList.add('lab-wall');
+    let i = 0, loaded = 0;
+    const tick = async () => {
+      if (!L.sem || Date.now() - loaded > WALL_RELOAD_MS) {
+        try { L.sem = await api('seminar'); loaded = Date.now(); } catch { /* keep the last agenda */ }
+      }
+      const items = semItems();
+      wallSlide(items.length ? items[i % items.length] : null, items.length ? (i % items.length) + 1 : 0, items.length);
+      i += 1;
+    };
+    await tick();
+    setInterval(tick, WALL_SLIDE_MS);
+  }
+
+  function wallSlide(t, n, total) {
+    let ov = $('#sem-present');
+    if (!ov) { ov = document.createElement('div'); ov.id = 'sem-present'; ov.className = 'sempresent wall'; ov.setAttribute('aria-live', 'polite'); document.body.append(ov); }
+    const sem = (L.sem && L.sem.seminar) || {};
+    const day = sem.day ? new Date(sem.day).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' }) : '';
+    if (!t) {
+      ov.innerHTML = `<div class="semslide"><p class="labhint">Workgroup seminar${day ? ' · ' + esc(day) : ''}</p><h1>The agenda fills itself</h1>
+<p class="big">Flag a tick for the seminar (⚑ in the Ticker), add a gel result, or ask a question in a comment: it appears here.</p></div>`;
+      return;
+    }
+    ov.innerHTML = `<div class="semslide"><p class="labhint">Workgroup seminar${day ? ' · ' + esc(day) : ''} · ${esc(t.person)} · ${n} / ${total}</p><h1>${esc(t.title)}</h1>
+<p>${t.why.map((w) => `<span class="chip ${esc(w)}">${esc(WHY[w] || w)}</span>`).join(' ')}</p>
+${t.excerpt ? `<p class="big">${esc(t.excerpt)}</p>` : ''}
+${t.comments.filter((c) => !c.text.startsWith('[Seminar ')).slice(-3).map((c) => `<div class="cm"><b>${esc(c.who)}</b>: ${esc(c.text)}</div>`).join('')}
+${t.notes.map((n2) => `<div class="cm semnote"><b>${esc(n2.name)}</b>: ${esc(n2.text)}</div>`).join('')}</div>`;
+  }
 
   async function semClick(t) {
     if (t.matches('[data-sem-flag]')) {
