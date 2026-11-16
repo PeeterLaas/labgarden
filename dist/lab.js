@@ -94,6 +94,11 @@
     try {
       L.me = await api('me');
       $('.privacy').textContent = L.me.display ? `Wall screen · ${L.me.device}` : `Lab connected · ${L.me.user}`;
+      if (!L.me.display && L.me.auth === 'password' && L.me.gateway) {   // the PAIvik sign-in: change it on the gateway
+        const a = document.createElement('a');
+        a.href = `${L.me.gateway}/account/password`; a.textContent = 'Change password'; a.className = 'pwlink';
+        $('.privacy').append(' · ', a);
+      }
       if (L.me.display) { wallShow(); return; }  // a wall screen (display key): the Seminar slideshow, nothing else
     } catch (err) {
       $('.privacy').textContent = err.code === 'SIGN_IN' ? 'Lab: not signed in' : 'Lab server not reachable';
