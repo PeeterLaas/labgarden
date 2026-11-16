@@ -423,3 +423,11 @@ select.manuadd{font:inherit;font-size:13px;border:1px solid var(--line);border-r
 .balst{font-size:13px;padding:1px 8px;border-radius:99px;border:1px solid var(--line);color:var(--muted)}
 .bal-ok{color:var(--ok);border-color:var(--ok)}.bal-offline,.bal-over,.bal-under{color:var(--danger);border-color:var(--danger)}
 .balcard input{flex:1;min-width:140px;font:inherit;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text)}
+
+/* Lab mode: wall screen (display key): the slideshow fills the screen, no controls */
+body.lab-wall .sidebar, body.lab-wall .topbar, body.lab-wall .labtoast { display: none !important; }
+.sempresent.wall { cursor: none; }
+.sempresent.wall .semslide h1 { font-size: clamp(32px, 4.2vw, 64px); }
+.sempresent.wall .big { font-size: clamp(20px, 2vw, 30px); }
+
+.privacy .pwlink{color:inherit;text-decoration:underline}
